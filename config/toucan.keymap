@@ -7,6 +7,11 @@
 #define SYM  2
 #define ADJ  3
 
+&mt {
+    tapping-term-ms = <800>;
+    flavor = "tap-preferred";
+};
+
 / {
     conditional_layers {
         compatible = "zmk,conditional-layers";

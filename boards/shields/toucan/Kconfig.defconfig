@@ -26,7 +26,8 @@ config ZMK_STATUS_ADV_ACTIVE_INTERVAL_MS
     default 100
 
 config ZMK_STATUS_ADV_IDLE_INTERVAL_MS
-    30000
+    default 30000
+
 endif
 
 

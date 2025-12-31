@@ -18,7 +18,6 @@ config ZMK_STATUS_ADVERTISEMENT
 config ZMK_STATUS_ADV_KEYBOARD_NAME
     default "Toucan"
 
-# Power optimization (10Hz active, 0.03Hz idle)
 config ZMK_STATUS_ADV_ACTIVITY_BASED
     default y
 

@@ -28,7 +28,7 @@
         base {
             display-name = "BASE";
             bindings = <
-&kp ESC  &kp Q  &kp W  &kp E  &mt LS(LG(NUMBER_4)) R  &mt LG(T) T  &kp Y  &mt LG(U) U  &mt LG(I) I  &kp O  &mt LG(P) P  &kp BSPC  &kp TAB  &mt LG(A) A  &mt LG(S) S  &kp D  &mt LG(F) F  &mt LG(G) G  &kp H  &kp J  &kp K  &kp L  &kp SQT  &kp ENTER  &kp LSHFT  &mt LG(Z) Z  &mt LG(X) X  &mt LG(C) C  &mt LG(V) V  &mt LG(B) B  &mt LG(N) N  &kp M  &kp COMMA  &kp DOT  &kp FSLH  &lt 2 MINUS  &kp LEFT_ALT  &kp LEFT_GUI  &kp EQUAL  &kp SPACE  &lt 1 COLON  &lt 2 SEMICOLON
+&kp ESC  &kp Q  &kp W  &kp E  &mt LS(LG(NUMBER_4)) R  &mt LG(T) T  &kp Y  &mt LG(U) U  &mt LG(I) I  &kp O  &mt LG(P) P  &kp BSPC  &kp TAB  &mt LG(A) A  &mt LG(S) S  &kp D  &mt LG(F) F  &mt LG(G) G  &kp H  &kp J  &kp K  &kp L  &kp SQT  &kp ENTER  &kp LSHFT  &mt LG(Z) Z  &mt LG(X) X  &mt LG(C) C  &mt LG(V) V  &mt LG(B) B  &mt LG(N) N  &kp M  &kp COMMA  &kp DOT  &kp FSLH  &lt 2 MINUS  &kp LEFT_ALT  &kp LEFT_GUI  &lt 1 EQUAL  &kp SPACE  &lt 1 COLON  &lt 2 SEMICOLON
             >;
         };
 

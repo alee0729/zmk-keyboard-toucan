@@ -12,20 +12,20 @@ config ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING
 config ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_PROXY
     default y
 
-config ZMK_STATUS_ADVERTISEMENT
-    default y
+# config ZMK_STATUS_ADVERTISEMENT
+#    default y
 
-config ZMK_STATUS_ADV_KEYBOARD_NAME
-    default "Toucan"
+# config ZMK_STATUS_ADV_KEYBOARD_NAME
+#    default "Toucan"
 
-config ZMK_STATUS_ADV_ACTIVITY_BASED
-    default y
+# config ZMK_STATUS_ADV_ACTIVITY_BASED
+#    default y
 
-config ZMK_STATUS_ADV_ACTIVE_INTERVAL_MS
-    default 100
+# config ZMK_STATUS_ADV_ACTIVE_INTERVAL_MS
+#    default 100
 
-config ZMK_STATUS_ADV_IDLE_INTERVAL_MS
-    default 30000
+# config ZMK_STATUS_ADV_IDLE_INTERVAL_MS
+#    default 30000
 
 endif
 

@@ -5,7 +5,7 @@ manifest:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
     - name: petejohanson
-      url-base: https://github.com/petejohanson/
+      url-base: https://github.com/alee0729
     - name: caksoylar
       url-base: https://github.com/caksoylar
     - name: prospector

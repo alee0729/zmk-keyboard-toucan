@@ -19,7 +19,7 @@ manifest:
       remote: zmkfirmware
       import: app/west.yml
     - name: cirque-input-module
-      remote: geeeksville
+      remote: geeksville
       revision: main
     - name: zmk-rgbled-widget
       remote: caksoylar

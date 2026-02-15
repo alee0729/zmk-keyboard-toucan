@@ -20,9 +20,11 @@
 ---
 include:
   - board: seeeduino_xiao_ble
-    shield: toucan_left rgbled_adapter nice_view_gem
+    shield: toucan_dongle rgbled_adapter prospector_adapter
     snippet: studio-rpc-usb-uart
     cmake-args: -DCONFIG_ZMK_STUDIO=y
+  - board: seeeduino_xiao_ble
+    shield: toucan_left rgbled_adapter toucan_pet
   - board: seeeduino_xiao_ble
     shield: toucan_right rgbled_adapter
   - board: seeeduino_xiao_ble

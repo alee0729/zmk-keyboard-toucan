@@ -6,7 +6,6 @@
 #define BASE 0
 #define NAV  1
 #define SYM  2
-#define MOUSE 3
 
 &mt {
     tapping-term-ms = <800>;
@@ -63,13 +62,6 @@
             display-name = "SYM";
             bindings = <
 &kp TILDE  &kp EXCL  &kp AT  &kp HASH  &kp DLLR  &kp PRCNT  &kp CARET  &kp AMPS  &kp ASTERISK  &kp LPAR  &kp RPAR  &kp BSPC  &trans  &trans  &trans  &trans  &trans  &bootloader  &bootloader  &trans  &trans  &kp LC(LEFT)  &kp UP_ARROW  &kp LC(RIGHT)  &trans  &kp K_MUTE  &kp C_VOLUME_DOWN  &kp C_VOLUME_UP  &trans  &trans  &kp K_MUTE  &kp C_VOLUME_DOWN  &kp C_VOLUME_UP  &kp LEFT  &kp DOWN  &kp RIGHT  &trans  &trans  &trans  &trans  &trans  &trans
-            >;
-        };
-
-        mouse {
-            display-name = "MOUSE";
-            bindings = <
-&tog 0  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp BSPC  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &bt LSHFT  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp LEFT_ALT  &kp LEFT_COMMAND  &kp SPACE  &mkp LCLK  &mkp RCLK  &trans
             >;
         };
 

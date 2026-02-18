@@ -6,7 +6,7 @@
 #define BASE 0
 #define NAV  1
 #define SYM  2
-#define ADJ  3
+#define MOUSE 3
 
 &mt {
     tapping-term-ms = <800>;

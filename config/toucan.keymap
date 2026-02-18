@@ -33,7 +33,6 @@
             locking;
         };
     };
-};
 
     combos {
         compatible = "zmk,combos";

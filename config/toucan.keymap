@@ -6,7 +6,7 @@
 #define BASE 0
 #define NAV  1
 #define SYM  2
-#define MOUSE 3
+#define ADJ  3
 
 &mt {
     tapping-term-ms = <800>;
@@ -66,7 +66,7 @@
             >;
         };
 
-        mouse {
+        adj {
             display-name = "MOUSE";
             bindings = <
 &tog 0  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp BSPC  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &bt LSHFT  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp LEFT_ALT  &kp LEFT_COMMAND  &kp SPACE  &mkp LCLK  &mkp RCLK  &trans

@@ -25,7 +25,7 @@ manifest:
       revision: toucan
     - name: zmk-rgbled-widget
       remote: caksoylar
-      revision: main
+      revision: v0.3
     - name: prospector-zmk-module
       remote: carrefinho
       revision: main

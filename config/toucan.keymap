@@ -14,31 +14,31 @@
 };
 
 / {
-#    conditional_layers {
-#        compatible = "zmk,conditional-layers";
-#
-#        tri_layer {
-#            if-layers = <1 2>;
-#            then-layer = <3>;
-#        };
-#    };
+/    conditional_layers {
+/        compatible = "zmk,conditional-layers";
+/
+/        tri_layer {
+/            if-layers = <1 2>;
+/            then-layer = <3>;
+/        };
+/    };
 
     combos {
         compatible = "zmk,combos";
 
         LeftMouseClick {
             bindings = <&mkp LCLK>;
-            key-positions = <38 37>;
+            key-positions = <37 36>;
         };
 
         RightMouseClick {
             bindings = <&mkp RCLK>;
-            key-positions = <41 40>;
+            key-positions = <38 37>;
         };
 
         MouseModeToggle {
             bindings = <&tog 3>;
-            key-positions = <39 40>;
+            key-positions = <41 40>;
         };
     };
 

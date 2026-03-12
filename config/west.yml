@@ -22,6 +22,7 @@ manifest:
     - name: zmk
       remote: zmkfirmware
       import: app/west.yml
+      revision: v0.3
     - name: cirque-input-module
       remote: geeksville
       revision: toucan
@@ -33,7 +34,7 @@ manifest:
  #     revision: main
     - name: zmk-dongle-screen
       remote: janpfischer
-      revision: upgrade-4.1
+      revision: main
       
   self:
     path: config

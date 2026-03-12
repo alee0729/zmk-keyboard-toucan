@@ -21,10 +21,9 @@
 include:
   - board: seeeduino_xiao_ble
 #    shield: toucan_dongle rgbled_adapter prospector_adapter
-    shield: toucan_dongle dongle_screen
-    cmake-args: -DCONFIG_LOG_PROCESS_THREAD_STARTUP_DELAY_MS=8000
-#    snippet: studio-rpc-usb-uart
-#    cmake-args: -DCONFIG_ZMK_STUDIO=y
+    shield: toucan_dongle rgbled_adapter dongle_screen
+    snippet: studio-rpc-usb-uart
+    cmake-args: -DCONFIG_ZMK_STUDIO=y
   - board: seeeduino_xiao_ble
     shield: toucan_left rgbled_adapter toucan_pet
   - board: seeeduino_xiao_ble

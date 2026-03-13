@@ -32,7 +32,7 @@
         MouseModeToggle {
             bindings = <&tog 3>;
             key-positions = <41 40>;
-            layers = <0>;
+            layers = <0 3>;
         };
     };
 

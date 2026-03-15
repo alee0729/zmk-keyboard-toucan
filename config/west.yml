@@ -34,7 +34,7 @@ manifest:
       remote: carrefinho
       revision: main
     - name: zmk-dongle-screen
-      remote: alee0729
+      remote: albertclee
       revision: claude/enhance-wpm-meter-y9Hrb
       
   self:

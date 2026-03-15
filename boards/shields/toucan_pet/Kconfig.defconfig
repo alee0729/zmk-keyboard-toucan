@@ -34,7 +34,7 @@ config NICE_VIEW_WIDGET_STATUS
     select LV_USE_ANIMIMG
     select LV_USE_ANIMATION
 
-config NICE_VIEW_WIDGET_INVERTED
-    bool "Invert display colors"
+# config NICE_VIEW_WIDGET_INVERTED
+#    bool "Invert display colors"
 
 endif

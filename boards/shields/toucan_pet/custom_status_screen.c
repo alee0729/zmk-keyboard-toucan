@@ -22,6 +22,13 @@ void setup_status_screen(lv_obj_t *screen) {
     lv_img_set_src(screen_img, &toucan128);
     lv_obj_center(screen_img);
 
+    awake_label = lv_label_create(screen);
+    lv_label_set_text(active_label, "PROSPECTOR MODE");
+    lv_obj_set_style_text_font(active_label, &quinquefive_8, LV_PART_MAIN);
+    lv_obj_set_style_text_color(active_label, lv_color_white(), LV_PART_MAIN);
+    lv_obj_align(active_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_add_flag(active_label, LV_OBJ_FLAG_HIDDEN);
+
     sleep_label = lv_label_create(screen);
     lv_label_set_text(sleep_label, "SLEEP");
     lv_obj_set_style_text_font(sleep_label, &quinquefive_8, LV_PART_MAIN);
@@ -45,14 +52,16 @@ static int display_activity_event_handler(const zmk_event_t *eh) {
     switch (ev->state) {
     case ZMK_ACTIVITY_ACTIVE:
         set_sleep_screen_active(false);
-        lv_obj_add_flag(sleep_label, LV_OBJ_FLAG_HIDDEN);
         lv_img_set_src(screen_img, &toucan128);
         lv_obj_center(screen_img);
+        lv_obj_add_flag(sleep_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(active_label, LV_OBJ_FLAG_HIDDEN);
         break;
     case ZMK_ACTIVITY_SLEEP:
         set_sleep_screen_active(true);
         lv_img_set_src(screen_img, &sleep_icon);
         lv_obj_center(screen_img);
+        lv_obj_add_flag(active_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(sleep_label, LV_OBJ_FLAG_HIDDEN);
         lv_task_handler();
         lv_refr_now(NULL);

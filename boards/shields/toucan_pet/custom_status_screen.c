@@ -29,7 +29,6 @@ void setup_status_screen(lv_obj_t *screen) {
     lv_obj_set_style_text_font(active_label, &quinquefive_8, LV_PART_MAIN);
     lv_obj_set_style_text_color(active_label, lv_color_white(), LV_PART_MAIN);
     lv_obj_align(active_label, LV_ALIGN_BOTTOM_MID, 0, -10);
-    lv_obj_add_flag(active_label, LV_OBJ_FLAG_HIDDEN);
 
     sleep_label = lv_label_create(screen);
     lv_label_set_text(sleep_label, "SLEEP");

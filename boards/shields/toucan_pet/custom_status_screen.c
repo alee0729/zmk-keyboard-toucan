@@ -17,7 +17,6 @@ void setup_status_screen(lv_obj_t *screen) {
 
     screen_img = lv_img_create(screen);
     lv_img_set_src(screen_img, &toucan128);
-    lv_obj_center(screen_img);
 }
 
 lv_obj_t *zmk_display_status_screen() {
@@ -36,12 +35,10 @@ static int display_activity_event_handler(const zmk_event_t *eh) {
     case ZMK_ACTIVITY_ACTIVE:
         set_sleep_screen_active(false);
         lv_img_set_src(screen_img, &toucan128);
-        lv_obj_center(screen_img);
         break;
     case ZMK_ACTIVITY_SLEEP:
         set_sleep_screen_active(true);
         lv_img_set_src(screen_img, &sleep_icon);
-        lv_obj_center(screen_img);
         lv_task_handler();
         lv_refr_now(NULL);
         break;

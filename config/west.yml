@@ -17,9 +17,8 @@ manifest:
     - name: geeksville
       url-base: https://github.com/geeksville
     - name: janpfischer
-      url-base: https://github.com/janpfischer
-    - name: bwshockley
-      url-base: https://github.com/bwshockley
+      url-base: https://github.com/Dexter-KBD
+
   projects:
     - name: zmk
       remote: zmkfirmware
@@ -37,9 +36,6 @@ manifest:
     - name: zmk-dongle-screen
       remote: janpfischer
       revision: main
-#    - name: zmk-dongle-screen
-#      remote: bwshockley
-#      revision: main
       
   self:
     path: config

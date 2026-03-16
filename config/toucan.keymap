@@ -31,7 +31,7 @@
 
         MouseModeToggle {
             bindings = <&tog 3>;
-            key-positions = <41 40>;
+            key-positions = <41 40 39>;
             layers = <0 3>;
         };
     };
@@ -63,7 +63,7 @@
         adj {
             display-name = "Mouse";
             bindings = <
-&tog 0  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp BSPC  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &bt LSHFT  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp LEFT_ALT  &mkp LCLK  &mkp RCLK  &kp SPACE  &tog 0  &tog 0
+&tog 0  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp BSPC  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp LC(LEFT_ARROW)  &kp UP_ARROW  &kp LC(RIGHT_ARROW)  &bt LSHFT  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp LEFT_ARROW  &kp DOWN  &kp RIGHT_ARROW  &kp LEFT_ALT  &mkp LCLK  &mkp RCLK  &kp SPACE  &tog 0  &tog 0
             >;
         };
 

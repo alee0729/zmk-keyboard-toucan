@@ -288,7 +288,7 @@ peripheral_conn_get_state(const zmk_event_t *eh) {
     const struct zmk_split_peripheral_status_changed *ev =
         as_zmk_split_peripheral_status_changed(eh);
     return (struct peripheral_conn_state){
-        .connected = (ev != NULL) ? ev->available : false,
+        .connected = (ev != NULL) ? ev->connected : false,
     };
 }
 

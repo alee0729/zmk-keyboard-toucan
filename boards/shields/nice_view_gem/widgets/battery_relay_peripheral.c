@@ -25,6 +25,8 @@
 #include <zmk/event_manager.h>
 #include "../events/battery_relay_state_changed.h"
 
+ZMK_EVENT_IMPL(zmk_battery_relay_state_changed);
+
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 /* Maximum number of peripheral sources we track (matches dongle's peripheral count) */
@@ -58,11 +60,10 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
         relay_battery_cache[data->source] = data->level;
         LOG_DBG("battery relay: source %u level %u%%", data->source, data->level);
 
-        ZMK_EVENT_RAISE(new_zmk_battery_relay_state_changed(
-            ((struct zmk_battery_relay_state_changed){
-                .source          = data->source,
-                .state_of_charge = data->level,
-            })));
+        raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
+            .source          = data->source,
+            .state_of_charge = data->level,
+        });
     }
 
     return len;

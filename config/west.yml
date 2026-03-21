@@ -12,8 +12,6 @@ manifest:
       url-base: https://github.com/caksoylar
     - name: carrefinho
       url-base: https://github.com/carrefinho
-    - name: prospector
-      url-base: https://github.com/t-ogura
     - name: geeksville
       url-base: https://github.com/geeksville
     - name: janpfischer
@@ -35,7 +33,7 @@ manifest:
       revision: main
     - name: zmk-dongle-screen
       remote: albertclee
-      revision: claude/complete-battery-relay-eYu5q
+      revision: new-display
       
   self:
     path: config

@@ -22,5 +22,8 @@ manifest:
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3
+    - name: zmk-dongle-display
+      remote: albertclee
+      revision: new-display
   self:
     path: config

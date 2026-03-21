@@ -29,7 +29,7 @@
 #include <zephyr/logging/log.h>
 
 #include <zmk/event_manager.h>
-#include <zmk/events/split_peripheral_status_changed.h>
+#include <zmk/events/peripheral_battery_state_changed.h>
 #include <zmk/split/central.h>
 
 #include "battery_relay_central.h"

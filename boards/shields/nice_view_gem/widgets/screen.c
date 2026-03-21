@@ -29,12 +29,12 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include "battery.h"
 #include "battery_peripheral.h"
-#include "layer.h"
 #include "output.h"
 #include "screen.h"
 #include "sleep.h"
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+#include "layer.h"
 #include "profile.h"
 #endif
 
@@ -55,8 +55,8 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
 
     // Draw widgets
     draw_output_status(canvas, state);
-    draw_layer_status(canvas, state);
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    draw_layer_status(canvas, state);
     draw_profile_status(canvas, state);
 #endif
     draw_battery_status(canvas, state);
@@ -194,9 +194,10 @@ ZMK_SUBSCRIPTION(widget_battery_relay_status, zmk_battery_relay_state_changed);
 #endif /* !ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL */
 
 /**
- * Layer status (works on both central and peripheral — keymap is loaded on
- * each half independently in ZMK split)
+ * Layer status (central / non-split only — keymap functions are not linked
+ * in peripheral builds)
  **/
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 
 static void set_layer_status(struct zmk_widget_screen *widget, struct layer_status_state state) {
     widget->state.layer_index = zmk_keymap_highest_layer_active();
@@ -217,6 +218,8 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state,
                             layer_status_update_cb, layer_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
+
+#endif /* !ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL */
 
 /**
  * Output / connection status
@@ -360,7 +363,9 @@ int zmk_widget_screen_init(struct zmk_widget_screen *widget, lv_obj_t *parent) {
     widget_peripheral_conn_status_init();
 #endif
 
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     widget_layer_status_init();
+#endif
 
     return 0;
 }

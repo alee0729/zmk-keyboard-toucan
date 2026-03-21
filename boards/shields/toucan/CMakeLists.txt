@@ -1,0 +1,5 @@
+# Battery relay central — compile for the dongle (central) build only.
+# The peripheral side lives in boards/shields/nice_view_gem/widgets/battery_relay_peripheral.c.
+if(CONFIG_SHIELD_TOUCAN_DONGLE AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+  zephyr_library_sources(battery_relay_central.c)
+endif()

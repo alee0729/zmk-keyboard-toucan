@@ -35,7 +35,7 @@ manifest:
       revision: main
     - name: zmk-dongle-screen
       remote: albertclee
-      revision: claude/relay-dual-battery-info-tjMl4
+      revision: claude/complete-battery-relay-eYu5q
       
   self:
     path: config

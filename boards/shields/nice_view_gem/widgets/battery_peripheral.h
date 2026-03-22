@@ -4,6 +4,7 @@
 #include "util.h"
 
 struct battery_peripheral_status_state {
+    uint8_t source;
     uint8_t level;
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
     bool usb_present;

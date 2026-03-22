@@ -13,6 +13,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/battery.h>
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+#include <zephyr/bluetooth/conn.h>
 #include "../events/battery_relay_state_changed.h"
 #include "../events/layer_relay_state_changed.h"
 #endif
@@ -440,11 +441,40 @@ static void connection_status_update_cb(struct connection_status_state state) {
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) { set_connection_status(widget, state); }
 }
 
+/**
+ * Check if a BLE central is currently connected to this peripheral.
+ * Used during widget init (when no event is available) to pick up a
+ * connection that was established before the display widget started.
+ */
+static bool _found_active_conn;
+
+static void check_conn_cb(struct bt_conn *conn, void *data) {
+    if (_found_active_conn) {
+        return;
+    }
+    struct bt_conn_info info;
+    if (bt_conn_get_info(conn, &info) == 0 &&
+        info.type == BT_CONN_TYPE_LE &&
+        info.state == BT_CONN_STATE_CONNECTED) {
+        _found_active_conn = true;
+    }
+}
+
+static bool peripheral_has_active_connection(void) {
+    _found_active_conn = false;
+    bt_conn_foreach(BT_CONN_TYPE_LE, check_conn_cb, NULL);
+    return _found_active_conn;
+}
+
 static struct connection_status_state connection_status_get_state(const zmk_event_t *eh) {
     const struct zmk_split_peripheral_status_changed *ev =
         as_zmk_split_peripheral_status_changed(eh);
+    if (ev != NULL) {
+        return (struct connection_status_state){ .connected = ev->connected };
+    }
+    /* Init path: no event yet — query actual BLE state */
     return (struct connection_status_state){
-        .connected = (ev != NULL) ? ev->connected : false,
+        .connected = peripheral_has_active_connection(),
     };
 }
 

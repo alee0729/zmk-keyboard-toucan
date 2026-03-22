@@ -13,13 +13,17 @@
  * current layer even though the left is itself a peripheral.
  *
  * Discovery flow per connection:
- *   1. BT_CONN_CB_DEFINE.connected  → schedule delayed work (500 ms) so
- *      ZMK's own GATT discovery can finish first.
+ *   1. BT_CONN_CB_DEFINE.connected  → schedule delayed work (1500 ms) so
+ *      ZMK's own GATT discovery and the battery relay discovery (at 500 ms)
+ *      can finish first.
  *   2. Delayed work fires           → bt_gatt_discover (CHARACTERISTIC scan,
  *      full ATT range) for LAYER_RELAY_CHAR_UUID.
  *   3. Discovery callback           → store value handle + push current layer.
  *   4. zmk_layer_state_changed      → write highest active layer to all
  *      connections with a known handle.
+ *
+ * A periodic rebroadcast (every 60 s) pushes the current layer to all
+ * peripherals to recover from any dropped BLE writes.
  */
 
 #include <zephyr/kernel.h>
@@ -38,6 +42,7 @@
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define RELAY_MAX_CONNS ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT
+#define RELAY_PERIODIC_BROADCAST_MS 60000
 
 /* Per-connection relay state */
 struct relay_conn_info {
@@ -50,6 +55,9 @@ struct relay_conn_info {
 };
 
 static struct relay_conn_info relay_conns[RELAY_MAX_CONNS];
+
+/* Periodic rebroadcast work */
+static struct k_work_delayable periodic_broadcast_work;
 
 /* ------------------------------------------------------------------ */
 /* GATT write helpers                                                   */
@@ -134,6 +142,16 @@ static void discovery_work_fn(struct k_work *work) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Periodic rebroadcast                                                 */
+/* ------------------------------------------------------------------ */
+
+static void periodic_broadcast_fn(struct k_work *work) {
+    uint8_t layer = zmk_keymap_highest_layer_active();
+    relay_layer_to_all(layer);
+    k_work_schedule(&periodic_broadcast_work, K_MSEC(RELAY_PERIODIC_BROADCAST_MS));
+}
+
+/* ------------------------------------------------------------------ */
 /* BT connection callbacks                                              */
 /* ------------------------------------------------------------------ */
 
@@ -201,6 +219,8 @@ static int layer_relay_central_init(void) {
         relay_conns[i].discovering = false;
         k_work_init_delayable(&relay_conns[i].discovery_work, discovery_work_fn);
     }
+    k_work_init_delayable(&periodic_broadcast_work, periodic_broadcast_fn);
+    k_work_schedule(&periodic_broadcast_work, K_MSEC(RELAY_PERIODIC_BROADCAST_MS));
     return 0;
 }
 

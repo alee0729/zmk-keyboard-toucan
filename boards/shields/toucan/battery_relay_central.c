@@ -20,6 +20,9 @@
  *   3. Discovery callback           → store value handle.
  *   4. zmk_peripheral_battery_state_changed → update cache + write to all
  *      connections with a known handle.
+ *
+ * A periodic rebroadcast (every 60 s) pushes cached state to all peripherals
+ * to recover from any dropped BLE writes.
  */
 
 #include <zephyr/kernel.h>
@@ -37,6 +40,7 @@
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define RELAY_MAX_CONNS ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT
+#define RELAY_PERIODIC_BROADCAST_MS 60000
 
 /* Per-connection relay state */
 struct relay_conn_info {
@@ -53,6 +57,9 @@ static struct relay_conn_info relay_conns[RELAY_MAX_CONNS];
 /* Cache of the most recent battery level for each peripheral index */
 static uint8_t battery_cache[RELAY_MAX_CONNS];
 
+/* Periodic rebroadcast work */
+static struct k_work_delayable periodic_broadcast_work;
+
 /* ------------------------------------------------------------------ */
 /* GATT write helpers                                                   */
 /* ------------------------------------------------------------------ */
@@ -62,7 +69,8 @@ static void relay_battery_to_all(void) {
         if (relay_conns[i].conn == NULL || relay_conns[i].handle == 0) {
             continue;
         }
-        /* Write each cached level to this peripheral */
+        /* Write each cached level to this peripheral, with a small gap
+         * between writes so the BLE TX buffer doesn't overflow. */
         for (int src = 0; src < RELAY_MAX_CONNS; src++) {
             struct battery_relay_data data = {
                 .source = (uint8_t)src,
@@ -73,6 +81,9 @@ static void relay_battery_to_all(void) {
                                                      &data, sizeof(data), false);
             if (err) {
                 LOG_DBG("relay write to slot %d src %d err %d", i, src, err);
+            }
+            if (src + 1 < RELAY_MAX_CONNS) {
+                k_sleep(K_MSEC(5));
             }
         }
     }
@@ -106,6 +117,9 @@ static uint8_t char_discover_cb(struct bt_conn *conn,
                 };
                 bt_gatt_write_without_response(conn, relay_conns[i].handle,
                                                &data, sizeof(data), false);
+                if (src + 1 < RELAY_MAX_CONNS) {
+                    k_sleep(K_MSEC(5));
+                }
             }
         }
         break;
@@ -143,6 +157,15 @@ static void discovery_work_fn(struct k_work *work) {
         return;
     }
     start_discovery(info);
+}
+
+/* ------------------------------------------------------------------ */
+/* Periodic rebroadcast                                                 */
+/* ------------------------------------------------------------------ */
+
+static void periodic_broadcast_fn(struct k_work *work) {
+    relay_battery_to_all();
+    k_work_schedule(&periodic_broadcast_work, K_MSEC(RELAY_PERIODIC_BROADCAST_MS));
 }
 
 /* ------------------------------------------------------------------ */
@@ -216,6 +239,8 @@ static int battery_relay_central_init(void) {
         k_work_init_delayable(&relay_conns[i].discovery_work, discovery_work_fn);
         battery_cache[i] = 0;
     }
+    k_work_init_delayable(&periodic_broadcast_work, periodic_broadcast_fn);
+    k_work_schedule(&periodic_broadcast_work, K_MSEC(RELAY_PERIODIC_BROADCAST_MS));
     return 0;
 }
 

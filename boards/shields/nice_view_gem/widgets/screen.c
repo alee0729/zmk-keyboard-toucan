@@ -8,6 +8,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/battery.h>
+#if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+#include "../events/battery_relay_state_changed.h"
+#endif
 #include <zmk/display.h>
 #include <zmk/display/widgets/battery_status.h>
 
@@ -108,13 +111,13 @@ ZMK_SUBSCRIPTION(widget_battery_status, zmk_usb_conn_state_changed);
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
 
 /**
- * Battery peripheral status (right half)
+ * Battery peripheral status (other half)
  *
- * On central: uses zmk_split_central_get_peripheral_battery_level() to read
- *   the peripheral battery directly.
- * On peripheral: receives relayed battery data from the dongle via the
- *   battery relay GATT service.  Only updates for source != 0 (i.e. the
- *   other half's battery, not our own relayed back).
+ * On central: listens for zmk_peripheral_battery_state_changed (raised by ZMK split).
+ *   Source 0 = first peripheral (right half). Skip other sources.
+ * On peripheral: listens for zmk_battery_relay_state_changed (raised by battery_relay_peripheral.c
+ *   when the dongle writes relay data). Source 0 = left half, source 1 = us (right half).
+ *   Skip source 0 (our own battery relayed back), show source 1 (the other half).
  **/
 
 static void set_battery_peripheral_status(struct zmk_widget_screen *widget,
@@ -124,17 +127,17 @@ static void set_battery_peripheral_status(struct zmk_widget_screen *widget,
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    uint8_t level;
-    zmk_split_central_get_peripheral_battery_level(0, &level);
-    widget->state.battery_p = level;
-#else
-    /* On peripheral: only update for the other half (source != 0).
-     * Source 0 is the left half (us), source 1 is the right half. */
-    if (state.source == 0) {
-        return; /* Skip our own battery being relayed back */
+    /* Central: show source 0 (the right half, first peripheral) */
+    if (state.source != 0) {
+        return;
     }
-    widget->state.battery_p = state.level;
+#else
+    /* Peripheral: skip source 0 (our own battery relayed back), show source 1 (other half) */
+    if (state.source == 0) {
+        return;
+    }
 #endif
+    widget->state.battery_p = state.level;
 
     draw_top(widget->obj, widget->cbuf, &widget->state);
 }
@@ -146,21 +149,29 @@ static void battery_peripheral_status_update_cb(struct battery_peripheral_status
 }
 
 static struct battery_peripheral_status_state battery_peripheral_status_get_state(const zmk_event_t *eh) {
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     const struct zmk_peripheral_battery_state_changed *ev = as_zmk_peripheral_battery_state_changed(eh);
-
     return (struct battery_peripheral_status_state){
         .source = ev->source,
         .level = ev->state_of_charge,
-#if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
-        .usb_present = zmk_usb_is_powered(),
-#endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
     };
+#else
+    const struct zmk_battery_relay_state_changed *ev = as_zmk_battery_relay_state_changed(eh);
+    return (struct battery_peripheral_status_state){
+        .source = ev->source,
+        .level = ev->state_of_charge,
+    };
+#endif
 }
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_peripheral_status, struct battery_peripheral_status_state,
                             battery_peripheral_status_update_cb, battery_peripheral_status_get_state);
 
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_peripheral_battery_state_changed);
+#else
+ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_battery_relay_state_changed);
+#endif
 
 /**
  * Central-only widgets: layer status, output status
@@ -172,7 +183,7 @@ ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_peripheral_battery_state_
 
 static void set_layer_status(struct zmk_widget_screen *widget, struct layer_status_state state) {
     widget->state.layer_index = zmk_keymap_highest_layer_active();
-    draw_top(widget->obj, widget->cbuf3, &widget->state);
+    draw_top(widget->obj, widget->cbuf, &widget->state);
 }
 
 static void layer_status_update_cb(struct layer_status_state state) {

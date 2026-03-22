@@ -20,9 +20,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/usb_conn_state_changed.h>
 #endif
 
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-/* Layer/keymap APIs are only linked for non-split or split-central builds. */
 #include <zmk/events/layer_state_changed.h>
+
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+/* Output/profile APIs are only linked for non-split or split-central builds. */
 #include <zmk/keymap.h>
 #include <zmk/events/ble_active_profile_changed.h>
 #include <zmk/events/endpoint_changed.h>
@@ -136,25 +137,31 @@ static void infer_local_source_from_local_level(uint8_t local_level) {
     }
 }
 
+static bool is_better_remote_candidate(const struct battery_relay_source_slot *candidate,
+                                       const struct battery_relay_source_slot *current) {
+    if (current == NULL) {
+        return true;
+    }
+
+    if (candidate->level != current->level) {
+        return candidate->level > current->level;
+    }
+
+    return candidate->last_seen_ms > current->last_seen_ms;
+}
+
 static uint8_t select_remote_source_candidate(void) {
-    struct battery_relay_source_slot *best_non_zero = NULL;
+    struct battery_relay_source_slot *best_non_local = NULL;
     struct battery_relay_source_slot *best_any = NULL;
-    struct battery_relay_source_slot *best_non_zero_non_local = NULL;
-    struct battery_relay_source_slot *best_any_non_local = NULL;
 
     for (size_t i = 0; i < ARRAY_SIZE(battery_relay_selection.slots); i++) {
         struct battery_relay_source_slot *slot = &battery_relay_selection.slots[i];
-        if (!slot->used) {
+        if (!slot->used || slot->level == 0) {
             continue;
         }
 
-        if (best_any == NULL || slot->last_seen_ms > best_any->last_seen_ms) {
+        if (is_better_remote_candidate(slot, best_any)) {
             best_any = slot;
-        }
-
-        if (slot->level > 0 &&
-            (best_non_zero == NULL || slot->last_seen_ms > best_non_zero->last_seen_ms)) {
-            best_non_zero = slot;
         }
 
         if (battery_relay_selection.inferred_local_source != BATTERY_RELAY_SOURCE_UNKNOWN &&
@@ -162,25 +169,13 @@ static uint8_t select_remote_source_candidate(void) {
             continue;
         }
 
-        if (best_any_non_local == NULL || slot->last_seen_ms > best_any_non_local->last_seen_ms) {
-            best_any_non_local = slot;
-        }
-
-        if (slot->level > 0 &&
-            (best_non_zero_non_local == NULL ||
-             slot->last_seen_ms > best_non_zero_non_local->last_seen_ms)) {
-            best_non_zero_non_local = slot;
+        if (is_better_remote_candidate(slot, best_non_local)) {
+            best_non_local = slot;
         }
     }
 
-    if (best_non_zero_non_local != NULL) {
-        return best_non_zero_non_local->source;
-    }
-    if (best_any_non_local != NULL) {
-        return best_any_non_local->source;
-    }
-    if (best_non_zero != NULL) {
-        return best_non_zero->source;
+    if (best_non_local != NULL) {
+        return best_non_local->source;
     }
     if (best_any != NULL) {
         return best_any->source;
@@ -339,9 +334,8 @@ ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_battery_relay_state_chang
 
 /* Layer status */
 
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 static void set_layer_status(struct zmk_widget_screen *widget, struct layer_status_state state) {
-    widget->state.layer_index = zmk_keymap_highest_layer_active();
+    widget->state.layer_index = state.index;
     draw_top(widget->obj, widget->cbuf, &widget->state);
 }
 
@@ -351,9 +345,10 @@ static void layer_status_update_cb(struct layer_status_state state) {
 }
 
 static struct layer_status_state layer_status_get_state(const zmk_event_t *eh) {
-    uint8_t index = zmk_keymap_highest_layer_active();
-    return (struct layer_status_state) {
-        .index = index
+    const struct zmk_layer_state_changed *ev = as_zmk_layer_state_changed(eh);
+
+    return (struct layer_status_state){
+        .index = (ev != NULL) ? ev->layer : 0,
     };
 }
 
@@ -361,9 +356,6 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
                             layer_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
-#else
-static inline void widget_layer_status_init(void) {}
-#endif
 
 /**
  * Role-specific widgets: output status (central/non-split), connection status (peripheral split)

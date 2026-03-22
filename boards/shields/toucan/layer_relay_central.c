@@ -146,8 +146,10 @@ static void relay_connected(struct bt_conn *conn, uint8_t err) {
             relay_conns[i].conn        = bt_conn_ref(conn);
             relay_conns[i].handle      = 0;
             relay_conns[i].discovering = false;
-            /* Delay discovery so ZMK's split GATT discovery can finish */
-            k_work_schedule(&relay_conns[i].discovery_work, K_MSEC(500));
+            /* Delay discovery so ZMK's split GATT discovery and the battery
+             * relay discovery (scheduled at 500 ms) can finish first.  Only one
+             * bt_gatt_discover call can be active per connection at a time. */
+            k_work_schedule(&relay_conns[i].discovery_work, K_MSEC(1500));
             break;
         }
     }

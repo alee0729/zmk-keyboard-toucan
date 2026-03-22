@@ -7,7 +7,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/event_manager.h>
 #include <zmk/events/activity_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zmk/events/layer_state_changed.h>
+#endif
 #include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/battery.h>
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
@@ -331,6 +333,7 @@ ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_peripheral_battery_state_
 ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_battery_relay_state_changed);
 #endif
 
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 /* Layer status */
 
 static void set_layer_status(struct zmk_widget_screen *widget, struct layer_status_state state) {
@@ -355,6 +358,8 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
                             layer_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
+
+#endif
 
 /**
  * Role-specific widgets: output status (central/non-split), connection status (peripheral split)

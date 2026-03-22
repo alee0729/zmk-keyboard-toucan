@@ -15,80 +15,37 @@ static void draw_usb_connected(lv_obj_t *canvas) {
 }
 #endif
 
-static void draw_ble_disconnected(lv_obj_t *canvas) {
-    lv_draw_label_dsc_t label_dsc;
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &quinquefive_8, LV_TEXT_ALIGN_LEFT);
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    lv_canvas_draw_text(canvas, 12, 140, SCREEN_WIDTH-8, &label_dsc, "NULL");
-#else
-    lv_canvas_draw_text(canvas, 12, 140, SCREEN_WIDTH-8, &label_dsc, "DISCONNECTED");
-#endif
-}
-
-static void draw_ble_connected(lv_obj_t *canvas) {
-    lv_draw_label_dsc_t label_dsc;
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &quinquefive_8, LV_TEXT_ALIGN_LEFT);
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    lv_canvas_draw_text(canvas, 12, 140, SCREEN_WIDTH-8, &label_dsc, "BLE");
-#else
-    lv_canvas_draw_text(canvas, 12, 140, SCREEN_WIDTH-8, &label_dsc, "DONGLE MODE");
-#endif
-}
-
 void draw_output_status(lv_obj_t *canvas, const struct status_state *state) {
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     switch (state->selected_endpoint.transport) {
         case ZMK_TRANSPORT_USB:
             draw_usb_connected(canvas);
             break;
-        case ZMK_TRANSPORT_BLE:
-            draw_ble_connected(canvas);
+        case ZMK_TRANSPORT_BLE: {
+            lv_draw_label_dsc_t label_dsc;
+            init_label_dsc(&label_dsc, LVGL_FOREGROUND, &quinquefive_8, LV_TEXT_ALIGN_LEFT);
+            lv_canvas_draw_text(canvas, 12, 140, SCREEN_WIDTH-8, &label_dsc, "BLE");
             break;
-        default:
-            draw_ble_disconnected(canvas);
-            break;
-    }
-#else
-    if (state->connected) {
-        draw_ble_connected(canvas);
-    } else {
-        draw_ble_disconnected(canvas);
-    }
-#endif
-
-    /*
-    lv_draw_label_dsc_t label_dsc;
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &lcd_phone, LV_TEXT_ALIGN_LEFT);
-    lv_canvas_draw_text(canvas, 0, 1, 25, &label_dsc, "SIG");
-
-    lv_draw_rect_dsc_t rect_white_dsc;
-    init_rect_dsc(&rect_white_dsc, LVGL_FOREGROUND);
-    lv_canvas_draw_rect(canvas, 43, 0, 24, 15, &rect_white_dsc);
-
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    switch (state->selected_endpoint.transport) {
-    case ZMK_TRANSPORT_USB:
-        draw_usb_connected(canvas);
-        break;
-
-    case ZMK_TRANSPORT_BLE:
-        if (state->active_profile_bonded) {
-            if (state->active_profile_connected) {
-                draw_ble_connected(canvas);
-            } else {
-                draw_ble_disconnected(canvas);
-            }
-        } else {
-            draw_ble_unbonded(canvas);
         }
-        break;
+        default: {
+            lv_draw_label_dsc_t label_dsc;
+            init_label_dsc(&label_dsc, LVGL_FOREGROUND, &quinquefive_8, LV_TEXT_ALIGN_LEFT);
+            lv_canvas_draw_text(canvas, 12, 140, SCREEN_WIDTH-8, &label_dsc, "NULL");
+            break;
+        }
     }
 #else
-    if (state->connected) {
-        draw_ble_connected(canvas);
-    } else {
-        draw_ble_disconnected(canvas);
-    }
+    /* Peripheral: show dongle connection status centered at the bottom.
+     * lv_canvas_draw_text alignment can be unreliable across LVGL8 builds,
+     * so compute the x offset explicitly using lv_txt_get_size. */
+    lv_draw_label_dsc_t label_dsc;
+    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &quinquefive_8, LV_TEXT_ALIGN_LEFT);
+    const char *msg = state->connected ? "DONGLE MODE" : "DISCONNECTED";
+    lv_point_t txt_size;
+    lv_txt_get_size(&txt_size, msg, label_dsc.font, label_dsc.letter_space,
+                    label_dsc.line_space, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    lv_coord_t cx = (SCREEN_WIDTH - txt_size.x) / 2;
+    if (cx < 0) cx = 0;
+    lv_canvas_draw_text(canvas, cx, 140, SCREEN_WIDTH - cx, &label_dsc, msg);
 #endif
-*/
 }

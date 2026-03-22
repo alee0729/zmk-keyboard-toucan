@@ -18,13 +18,13 @@ struct status_state {
     uint8_t battery_p;
     bool charging;
     bool charging_p;
+    uint8_t layer_index; /* available to both roles; central forwards layer state to peripherals via BLE */
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    uint8_t layer_index;
-    const char *layer_label;
     struct zmk_endpoint_instance selected_endpoint;
     int active_profile_index;
     bool active_profile_connected;
     bool active_profile_bonded;
+    const char *layer_label;
 #else
     bool connected;
 #endif

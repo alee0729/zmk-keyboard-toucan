@@ -1,4 +1,5 @@
 #include <zephyr/kernel.h>
+#include <limits.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
@@ -49,6 +50,163 @@ struct connection_status_state {
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
+#define BATTERY_RELAY_SOURCE_SLOTS 4
+#define BATTERY_LEVEL_DIFF_MATCH_MAX 10
+#define BATTERY_RELAY_SOURCE_UNKNOWN UINT8_MAX
+
+struct battery_relay_source_slot {
+    bool used;
+    uint8_t source;
+    uint8_t level;
+    uint16_t local_match_score;
+    int64_t last_seen_ms;
+};
+
+struct battery_relay_selection_state {
+    bool local_level_valid;
+    uint8_t local_level;
+    uint8_t inferred_local_source;
+    struct battery_relay_source_slot slots[BATTERY_RELAY_SOURCE_SLOTS];
+};
+
+static struct battery_relay_selection_state battery_relay_selection = {
+    .inferred_local_source = BATTERY_RELAY_SOURCE_UNKNOWN,
+};
+
+static struct battery_relay_source_slot *get_or_create_source_slot(uint8_t source) {
+    struct battery_relay_source_slot *free_slot = NULL;
+    int64_t oldest_seen = INT64_MAX;
+    struct battery_relay_source_slot *oldest_slot = NULL;
+
+    for (size_t i = 0; i < ARRAY_SIZE(battery_relay_selection.slots); i++) {
+        struct battery_relay_source_slot *slot = &battery_relay_selection.slots[i];
+        if (slot->used && slot->source == source) {
+            return slot;
+        }
+
+        if (!slot->used && free_slot == NULL) {
+            free_slot = slot;
+        }
+
+        if (slot->used && slot->last_seen_ms < oldest_seen) {
+            oldest_seen = slot->last_seen_ms;
+            oldest_slot = slot;
+        }
+    }
+
+    struct battery_relay_source_slot *slot = (free_slot != NULL) ? free_slot : oldest_slot;
+    if (slot == NULL) {
+        return NULL;
+    }
+
+    *slot = (struct battery_relay_source_slot){
+        .used = true,
+        .source = source,
+    };
+    return slot;
+}
+
+static void infer_local_source_from_local_level(uint8_t local_level) {
+    uint16_t best_score = 0;
+    uint8_t best_source = BATTERY_RELAY_SOURCE_UNKNOWN;
+    uint16_t second_best_score = 0;
+
+    for (size_t i = 0; i < ARRAY_SIZE(battery_relay_selection.slots); i++) {
+        struct battery_relay_source_slot *slot = &battery_relay_selection.slots[i];
+        if (!slot->used) {
+            continue;
+        }
+
+        uint8_t diff = (slot->level > local_level) ? (slot->level - local_level)
+                                                    : (local_level - slot->level);
+        if (diff <= BATTERY_LEVEL_DIFF_MATCH_MAX) {
+            slot->local_match_score += (BATTERY_LEVEL_DIFF_MATCH_MAX + 1u - diff);
+        }
+
+        if (slot->local_match_score >= best_score) {
+            second_best_score = best_score;
+            best_score = slot->local_match_score;
+            best_source = slot->source;
+        } else if (slot->local_match_score > second_best_score) {
+            second_best_score = slot->local_match_score;
+        }
+    }
+
+    if (best_source != BATTERY_RELAY_SOURCE_UNKNOWN && best_score > second_best_score) {
+        battery_relay_selection.inferred_local_source = best_source;
+    }
+}
+
+static uint8_t select_remote_source_candidate(void) {
+    struct battery_relay_source_slot *best_non_zero = NULL;
+    struct battery_relay_source_slot *best_any = NULL;
+    struct battery_relay_source_slot *best_non_zero_non_local = NULL;
+    struct battery_relay_source_slot *best_any_non_local = NULL;
+
+    for (size_t i = 0; i < ARRAY_SIZE(battery_relay_selection.slots); i++) {
+        struct battery_relay_source_slot *slot = &battery_relay_selection.slots[i];
+        if (!slot->used) {
+            continue;
+        }
+
+        if (best_any == NULL || slot->last_seen_ms > best_any->last_seen_ms) {
+            best_any = slot;
+        }
+
+        if (slot->level > 0 &&
+            (best_non_zero == NULL || slot->last_seen_ms > best_non_zero->last_seen_ms)) {
+            best_non_zero = slot;
+        }
+
+        if (battery_relay_selection.inferred_local_source != BATTERY_RELAY_SOURCE_UNKNOWN &&
+            slot->source == battery_relay_selection.inferred_local_source) {
+            continue;
+        }
+
+        if (best_any_non_local == NULL || slot->last_seen_ms > best_any_non_local->last_seen_ms) {
+            best_any_non_local = slot;
+        }
+
+        if (slot->level > 0 &&
+            (best_non_zero_non_local == NULL ||
+             slot->last_seen_ms > best_non_zero_non_local->last_seen_ms)) {
+            best_non_zero_non_local = slot;
+        }
+    }
+
+    if (best_non_zero_non_local != NULL) {
+        return best_non_zero_non_local->source;
+    }
+    if (best_any_non_local != NULL) {
+        return best_any_non_local->source;
+    }
+    if (best_non_zero != NULL) {
+        return best_non_zero->source;
+    }
+    if (best_any != NULL) {
+        return best_any->source;
+    }
+
+    return BATTERY_RELAY_SOURCE_UNKNOWN;
+}
+
+static bool get_remote_battery_level_from_sources(uint8_t *level_out) {
+    uint8_t remote_source = select_remote_source_candidate();
+    if (remote_source == BATTERY_RELAY_SOURCE_UNKNOWN) {
+        return false;
+    }
+
+    for (size_t i = 0; i < ARRAY_SIZE(battery_relay_selection.slots); i++) {
+        struct battery_relay_source_slot *slot = &battery_relay_selection.slots[i];
+        if (slot->used && slot->source == remote_source) {
+            *level_out = slot->level;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * Draw buffers
  **/
@@ -82,6 +240,9 @@ static void set_battery_status(struct zmk_widget_screen *widget,
     widget->state.charging = state.usb_present;
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
     widget->state.battery = state.level;
+    battery_relay_selection.local_level_valid = true;
+    battery_relay_selection.local_level = state.level;
+    infer_local_source_from_local_level(state.level);
 
     draw_top(widget->obj, widget->cbuf, &widget->state);
 }
@@ -113,11 +274,10 @@ ZMK_SUBSCRIPTION(widget_battery_status, zmk_usb_conn_state_changed);
 /**
  * Battery peripheral status (other half)
  *
- * On central: listens for zmk_peripheral_battery_state_changed (raised by ZMK split).
- *   Source 0 = first peripheral (right half). Skip other sources.
- * On peripheral: listens for zmk_battery_relay_state_changed (raised by battery_relay_peripheral.c
- *   when the dongle writes relay data). Source 0 = left half, source 1 = us (right half).
- *   Skip source 0 (our own battery relayed back), show source 1 (the other half).
+ * Handles split battery updates from any source and dynamically picks the
+ * "remote" source to display by comparing source values against local battery
+ * updates over time. If source identity is uncertain, it defensively prefers
+ * the newest non-zero relay value.
  **/
 
 static void set_battery_peripheral_status(struct zmk_widget_screen *widget,
@@ -125,19 +285,24 @@ static void set_battery_peripheral_status(struct zmk_widget_screen *widget,
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
     widget->state.charging_p = state.usb_present;
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
+    struct battery_relay_source_slot *slot = get_or_create_source_slot(state.source);
+    if (slot == NULL) {
+        return;
+    }
 
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    /* Central: show source 0 (the right half, first peripheral) */
-    if (state.source != 0) {
+    slot->level = state.level;
+    slot->last_seen_ms = k_uptime_get();
+
+    if (battery_relay_selection.local_level_valid) {
+        infer_local_source_from_local_level(battery_relay_selection.local_level);
+    }
+
+    uint8_t remote_level = 0;
+    if (!get_remote_battery_level_from_sources(&remote_level)) {
         return;
     }
-#else
-    /* Peripheral: skip source 0 (our own battery relayed back), show source 1 (other half) */
-    if (state.source == 0) {
-        return;
-    }
-#endif
-    widget->state.battery_p = state.level;
+
+    widget->state.battery_p = remote_level;
 
     draw_top(widget->obj, widget->cbuf, &widget->state);
 }

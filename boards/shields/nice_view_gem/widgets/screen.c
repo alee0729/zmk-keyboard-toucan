@@ -61,8 +61,8 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
 
     // Draw widgets
     draw_output_status(canvas, state);
-    draw_layer_status(canvas, state);
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    draw_layer_status(canvas, state);
     draw_profile_status(canvas, state);
 #endif
     draw_battery_status(canvas, state);
@@ -260,28 +260,6 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_connection_status, struct connection_status_s
                             connection_status_update_cb, connection_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_connection_status, zmk_split_peripheral_status_changed);
-
-/* Layer status on peripheral — ZMK central forwards layer changes via BLE GATT notify. */
-
-static void set_layer_status_periph(struct zmk_widget_screen *widget,
-                                    struct layer_status_state state) {
-    widget->state.layer_index = state.index;
-    draw_top(widget->obj, widget->cbuf, &widget->state);
-}
-
-static void layer_periph_status_update_cb(struct layer_status_state state) {
-    struct zmk_widget_screen *widget;
-    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) { set_layer_status_periph(widget, state); }
-}
-
-static struct layer_status_state layer_periph_status_get_state(const zmk_event_t *eh) {
-    return (struct layer_status_state){ .index = zmk_keymap_highest_layer_active() };
-}
-
-ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_periph_status, struct layer_status_state,
-                            layer_periph_status_update_cb, layer_periph_status_get_state)
-
-ZMK_SUBSCRIPTION(widget_layer_periph_status, zmk_layer_state_changed);
 
 #endif /* !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) */
 

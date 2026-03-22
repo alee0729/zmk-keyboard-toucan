@@ -23,7 +23,7 @@ include:
 #    shield: toucan_dongle rgbled_adapter prospector_adapter
     shield: toucan_dongle rgbled_adapter dongle_screen
     snippet: studio-rpc-usb-uart
-    cmake-args: -DCONFIG_ZMK_STUDIO=y
+    cmake-args: -DCONFIG_ZMK_STUDIO=y -DCONFIG_DONGLE_SCREEN_BATTERY_RELAY=n
   - board: seeeduino_xiao_ble
     shield: toucan_left rgbled_adapter nice_view_gem
     cmake-args: -DCONFIG_ZMK_SLEEP=y -DCONFIG_ZMK_PM_SOFT_OFF=y

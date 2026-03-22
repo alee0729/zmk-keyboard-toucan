@@ -20,11 +20,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/usb_conn_state_changed.h>
 #endif
 
-/* Layer and keymap headers needed by both roles (central forwards layer state to peripherals). */
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+/* Layer/keymap APIs are only linked for non-split or split-central builds. */
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/keymap.h>
-
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zmk/events/ble_active_profile_changed.h>
 #include <zmk/events/endpoint_changed.h>
 #include <zmk/events/wpm_state_changed.h>
@@ -340,6 +339,7 @@ ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_battery_relay_state_chang
 
 /* Layer status */
 
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 static void set_layer_status(struct zmk_widget_screen *widget, struct layer_status_state state) {
     widget->state.layer_index = zmk_keymap_highest_layer_active();
     draw_top(widget->obj, widget->cbuf, &widget->state);
@@ -361,6 +361,9 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
                             layer_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
+#else
+static inline void widget_layer_status_init(void) {}
+#endif
 
 /**
  * Role-specific widgets: output status (central/non-split), connection status (peripheral split)

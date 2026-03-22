@@ -23,6 +23,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 /* Output/profile APIs are only linked for non-split or split-central builds. */
 #include <zmk/events/layer_state_changed.h>
+
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+/* Output/profile APIs are only linked for non-split or split-central builds. */
 #include <zmk/keymap.h>
 #include <zmk/events/ble_active_profile_changed.h>
 #include <zmk/events/endpoint_changed.h>
@@ -333,7 +336,6 @@ ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_battery_relay_state_chang
 
 /* Layer status */
 
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 static void set_layer_status(struct zmk_widget_screen *widget, struct layer_status_state state) {
     widget->state.layer_index = state.index;
     draw_top(widget->obj, widget->cbuf, &widget->state);
@@ -345,9 +347,10 @@ static void layer_status_update_cb(struct layer_status_state state) {
 }
 
 static struct layer_status_state layer_status_get_state(const zmk_event_t *eh) {
-    uint8_t index = zmk_keymap_highest_layer_active();
-    return (struct layer_status_state) {
-        .index = index
+    const struct zmk_layer_state_changed *ev = as_zmk_layer_state_changed(eh);
+
+    return (struct layer_status_state){
+        .index = (ev != NULL) ? ev->layer : 0,
     };
 }
 
@@ -355,9 +358,6 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
                             layer_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
-#else
-static inline void widget_layer_status_init(void) {}
-#endif
 
 /**
  * Role-specific widgets: output status (central/non-split), connection status (peripheral split)

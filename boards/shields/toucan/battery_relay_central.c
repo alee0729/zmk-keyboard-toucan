@@ -33,7 +33,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
 
-#include <zmk/event_manager.h>
+#include <zmk/event-manager.h>
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/keymap.h>

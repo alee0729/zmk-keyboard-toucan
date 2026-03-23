@@ -22,7 +22,7 @@ manifest:
       revision: v0.3
     - name: zmk-dongle-screen
       remote: albertclee
-      revision: claude/fix-dongle-data-relay-eiviW
+      revision: new-display
       
   self:
     path: config

@@ -7,17 +7,15 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/event_manager.h>
 #include <zmk/events/activity_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) || IS_ENABLED(CONFIG_DONGLE_SCREEN_BATTERY_RELAY)
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zmk/events/layer_state_changed.h>
 #endif
 #include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/battery.h>
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zephyr/bluetooth/conn.h>
-#if !IS_ENABLED(CONFIG_DONGLE_SCREEN_BATTERY_RELAY)
 #include "../events/battery_relay_state_changed.h"
 #include "../events/layer_relay_state_changed.h"
-#endif
 #endif
 #include <zmk/display.h>
 #include <zmk/display/widgets/battery_status.h>
@@ -313,7 +311,7 @@ static void battery_peripheral_status_update_cb(struct battery_peripheral_status
 }
 
 static struct battery_peripheral_status_state battery_peripheral_status_get_state(const zmk_event_t *eh) {
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) || IS_ENABLED(CONFIG_DONGLE_SCREEN_BATTERY_RELAY)
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     const struct zmk_peripheral_battery_state_changed *ev = as_zmk_peripheral_battery_state_changed(eh);
     return (struct battery_peripheral_status_state){
         .source = ev->source,
@@ -331,7 +329,7 @@ static struct battery_peripheral_status_state battery_peripheral_status_get_stat
 ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_peripheral_status, struct battery_peripheral_status_state,
                             battery_peripheral_status_update_cb, battery_peripheral_status_get_state);
 
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) || IS_ENABLED(CONFIG_DONGLE_SCREEN_BATTERY_RELAY)
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_peripheral_battery_state_changed);
 #else
 ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_battery_relay_state_changed);
@@ -349,7 +347,7 @@ static void layer_status_update_cb(struct layer_status_state state) {
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) { set_layer_status(widget, state); }
 }
 
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) || IS_ENABLED(CONFIG_DONGLE_SCREEN_BATTERY_RELAY)
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 
 static struct layer_status_state layer_status_get_state(const zmk_event_t *eh) {
     const struct zmk_layer_state_changed *ev = as_zmk_layer_state_changed(eh);

@@ -27,7 +27,7 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/layer_state_changed.h>
 
-#include "battery_relay_central.h"
+#include "../boards/shields/nice_view_gem/widgets/battery_relay_protocol.h"
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -49,12 +49,12 @@ ZMK_EVENT_IMPL(zmk_peripheral_battery_state_changed);
 /* -------------------------------------------------------------------------
  * Relay cache
  *
- * Indexed by data.source.  BATTERY_RELAY_SOURCE_DONGLE (0xFF) is ignored
+ * Indexed by data.source. BATTERY_RELAY_SOURCE_DONGLE_MARKER (0xFF) is ignored
  * here because SOURCE_OFFSET == 0 on peripheral builds and there is no slot
  * for the dongle battery.
  * ---------------------------------------------------------------------- */
 
-static uint8_t relay_cache[CONFIG_DONGLE_SCREEN_BATTERY_RELAY_SOURCE_COUNT];
+static uint8_t relay_cache[BATTERY_RELAY_PERIPHERAL_SOURCE_COUNT];
 static uint8_t relayed_layer;
 
 uint8_t battery_relay_get_layer(void) {
@@ -79,7 +79,7 @@ static ssize_t battery_relay_write_cb(struct bt_conn *conn,
     LOG_INF("relay_periph: write received source=%u level=%u", data->source, data->level);
 
     /* Ignore the dongle's own battery (no slot for it on peripheral display) */
-    if (data->source == BATTERY_RELAY_SOURCE_DONGLE) {
+    if (data->source == BATTERY_RELAY_SOURCE_DONGLE_MARKER) {
         return len;
     }
 
@@ -87,7 +87,7 @@ static ssize_t battery_relay_write_cb(struct bt_conn *conn,
      * source=0xFE means level contains the active layer index.
      * Store it and raise zmk_layer_state_changed so the layer_status
      * widget redraws with the relayed value. */
-    if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
+    if (data->source == BATTERY_RELAY_SOURCE_LAYER_MARKER) {
         relayed_layer = data->level;
         LOG_DBG("relay: layer=%u", relayed_layer);
         raise_zmk_layer_state_changed((struct zmk_layer_state_changed){
@@ -98,13 +98,14 @@ static ssize_t battery_relay_write_cb(struct bt_conn *conn,
         return len;
     }
 
-    if (data->source >= CONFIG_DONGLE_SCREEN_BATTERY_RELAY_SOURCE_COUNT) {
-        LOG_WRN("battery_relay: source %u out of range (max %d)",
-                data->source, CONFIG_DONGLE_SCREEN_BATTERY_RELAY_SOURCE_COUNT - 1);
+    if (!battery_relay_source_is_peripheral(data->source)) {
+        LOG_WRN("battery_relay: source %u out of range (%u..%u)",
+                data->source, BATTERY_RELAY_PERIPHERAL_SOURCE_MIN,
+                BATTERY_RELAY_PERIPHERAL_SOURCE_MAX);
         return len;
     }
 
-    relay_cache[data->source] = data->level;
+    relay_cache[data->source - BATTERY_RELAY_PERIPHERAL_SOURCE_MIN] = data->level;
 
     LOG_DBG("battery_relay: source=%u level=%u%%", data->source, data->level);
 
@@ -124,9 +125,15 @@ static ssize_t battery_relay_write_cb(struct bt_conn *conn,
  * GATT service definition
  * ---------------------------------------------------------------------- */
 
+static struct bt_uuid_128 relay_svc_uuid =
+    BT_UUID_INIT_128(BATTERY_RELAY_SERVICE_UUID_VALUE);
+
+static struct bt_uuid_128 relay_char_uuid =
+    BT_UUID_INIT_128(BATTERY_RELAY_CHAR_UUID_VALUE);
+
 BT_GATT_SERVICE_DEFINE(battery_relay_svc,
-    BT_GATT_PRIMARY_SERVICE(BATTERY_RELAY_SERVICE_UUID),
-    BT_GATT_CHARACTERISTIC(BATTERY_RELAY_CHAR_UUID,
+    BT_GATT_PRIMARY_SERVICE(&relay_svc_uuid.uuid),
+    BT_GATT_CHARACTERISTIC(&relay_char_uuid.uuid,
         BT_GATT_CHRC_WRITE_WITHOUT_RESP,
         BT_GATT_PERM_WRITE,
         NULL, battery_relay_write_cb, NULL),

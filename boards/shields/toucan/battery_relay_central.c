@@ -12,7 +12,7 @@
  * relay characteristic using source = BATTERY_RELAY_SOURCE_LAYER (0xFE).
  *
  * Discovery flow per connection:
- *   1. BT_CONN_CB_DEFINE.connected  → schedule delayed work (500 ms) so
+ *   1. BT_CONN_CB_DEFINE.connected  → schedule delayed work (2000 ms) so
  *      ZMK's own GATT discovery can finish first.
  *   2. Delayed work fires           → bt_gatt_discover (CHARACTERISTIC scan)
  *      for BATTERY_RELAY_CHAR_UUID.
@@ -44,7 +44,7 @@
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define RELAY_MAX_CONNS ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT
-#define RELAY_DISCOVERY_DELAY_MS 500
+#define RELAY_DISCOVERY_DELAY_MS 2000
 #define RELAY_PERIODIC_BROADCAST_MS 60000
 
 /* Per-connection relay state */

@@ -4,18 +4,10 @@ manifest:
   remotes:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
-    - name: petejohanson
-      url-base: https://github.com/petejohanson
     - name: albertclee
       url-base: https://github.com/alee0729
     - name: caksoylar
       url-base: https://github.com/caksoylar
-    - name: carrefinho
-      url-base: https://github.com/carrefinho
-    - name: geeksville
-      url-base: https://github.com/geeksville
-    - name: janpfischer
-      url-base: https://github.com/Dexter-KBD
 
   projects:
     - name: zmk
@@ -28,12 +20,9 @@ manifest:
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3
-    - name: prospector-zmk-module
-      remote: carrefinho
-      revision: main
     - name: zmk-dongle-screen
       remote: albertclee
-      revision: claude/fix-shield-keypress-sleep-mA7sQ
+      revision: claude/fix-relay-battery-layer-zxnug
       
   self:
     path: config

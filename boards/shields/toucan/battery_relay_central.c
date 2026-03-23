@@ -183,6 +183,16 @@ static void relay_connected(struct bt_conn *conn, uint8_t err) {
     if (err) {
         return;
     }
+
+    /* Only track connections where we are the central (keyboard halves).
+     * Skip connections where we are the peripheral (BLE hosts/computers)
+     * so they don't steal relay slots. */
+    struct bt_conn_info conn_info;
+    if (bt_conn_get_info(conn, &conn_info) != 0 ||
+        conn_info.role != BT_CONN_ROLE_CENTRAL) {
+        return;
+    }
+
     for (int i = 0; i < RELAY_MAX_CONNS; i++) {
         if (relay_conns[i].conn == NULL) {
             relay_conns[i].conn        = bt_conn_ref(conn);

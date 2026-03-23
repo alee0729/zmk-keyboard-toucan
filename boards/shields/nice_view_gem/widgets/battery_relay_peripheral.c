@@ -5,14 +5,14 @@
  */
 
 /*
- * Battery Relay — peripheral (left half) side.
+ * Display Relay — peripheral (left half) side.
  *
  * The dongle discovers this GATT characteristic and writes battery_relay_data
- * packets to it whenever any peripheral's battery level changes.  Each write
- * updates a local cache and raises zmk_battery_relay_state_changed so the
- * nice!view display can update immediately.
+ * packets.  Battery data (source 0..N) updates battery cache and raises
+ * zmk_battery_relay_state_changed.  Layer data (source = 0xFE) updates layer
+ * cache and raises zmk_layer_relay_state_changed.
  *
- * UUID pair must match battery_relay_central.h in zmk-dongle-screen:
+ * UUID pair must match battery_relay_central.h in the toucan shield:
  *   Service  6e400010-b5a3-f393-e0a9-e50e24dcca9e
  *   Char     6e400011-b5a3-f393-e0a9-e50e24dcca9e
  */
@@ -24,21 +24,31 @@
 
 #include <zmk/event_manager.h>
 #include "../events/battery_relay_state_changed.h"
+#include "../events/layer_relay_state_changed.h"
 
 ZMK_EVENT_IMPL(zmk_battery_relay_state_changed);
+ZMK_EVENT_IMPL(zmk_layer_relay_state_changed);
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 /* Maximum number of peripheral sources we track (matches dongle's peripheral count) */
 #define RELAY_MAX_SOURCES 2
 
+/* source value indicating layer data instead of battery data */
+#define BATTERY_RELAY_SOURCE_LAYER 0xFE
+
 static uint8_t relay_battery_cache[RELAY_MAX_SOURCES];
+static uint8_t relay_layer_cache;
 
 uint8_t zmk_battery_relay_get_level(uint8_t source) {
     if (source >= RELAY_MAX_SOURCES) {
         return 0;
     }
     return relay_battery_cache[source];
+}
+
+uint8_t zmk_layer_relay_get_index(void) {
+    return relay_layer_cache;
 }
 
 /* Payload written by the dongle — must match battery_relay_central.h */
@@ -50,16 +60,26 @@ struct battery_relay_data {
 static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                const void *buf, uint16_t len, uint16_t offset, uint8_t flags) {
     if (len != sizeof(struct battery_relay_data)) {
-        LOG_WRN("battery relay write: unexpected length %u", len);
+        LOG_WRN("relay write: unexpected length %u", len);
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
     }
 
     const struct battery_relay_data *data = buf;
 
+    /* Layer data is multiplexed through source=0xFE */
+    if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
+        relay_layer_cache = data->level;
+        LOG_DBG("relay: layer %u", data->level);
+        raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
+            .layer = data->level,
+        });
+        return len;
+    }
+
+    /* Battery data */
     if (data->source < RELAY_MAX_SOURCES) {
         relay_battery_cache[data->source] = data->level;
-        LOG_DBG("battery relay: source %u level %u%%", data->source, data->level);
-
+        LOG_DBG("relay: source %u battery %u%%", data->source, data->level);
         raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
             .source          = data->source,
             .state_of_charge = data->level,

@@ -9,12 +9,11 @@
 #include <zephyr/kernel.h>
 
 /*
- * Battery Relay Service — central (dongle) side.
+ * Display Relay Service — central (dongle) side.
  *
  * The dongle discovers this characteristic on each connected peripheral and
- * writes updated battery levels whenever any peripheral's battery changes.
- * Both peripheral indices (0 = left, 1 = right) are written so the left half
- * can display the right half's battery level on its nice!view display.
+ * writes battery levels and layer state through it.  Layer data is multiplexed
+ * using source = BATTERY_RELAY_SOURCE_LAYER (0xFE).
  *
  * UUID pair is shared with the peripheral side
  * (boards/shields/nice_view_gem/widgets/battery_relay_peripheral.c).
@@ -28,8 +27,13 @@
 #define BATTERY_RELAY_CHAR_UUID                                                                    \
     BT_UUID_128_ENCODE(0x6e400011, 0xb5a3, 0xf393, 0xe0a9, 0xe50e24dcca9e)
 
+/* source value used to carry layer data through the battery relay characteristic.
+ * When source == BATTERY_RELAY_SOURCE_LAYER, the level field contains the
+ * highest active layer index instead of a battery percentage. */
+#define BATTERY_RELAY_SOURCE_LAYER 0xFE
+
 /* Payload written from dongle to each peripheral */
 struct battery_relay_data {
-    uint8_t source; /* peripheral index from dongle perspective: 0=left, 1=right */
-    uint8_t level;  /* battery level 0-100 */
+    uint8_t source; /* peripheral index (0=left, 1=right), or BATTERY_RELAY_SOURCE_LAYER */
+    uint8_t level;  /* battery level 0-100, or layer index when source=0xFE */
 } __packed;

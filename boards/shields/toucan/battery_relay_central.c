@@ -151,7 +151,13 @@ static void start_discovery(struct relay_conn_info *info) {
     int err = bt_gatt_discover(info->conn, &info->discover_params);
     if (err) {
         info->discovering = false;
-        LOG_DBG("bt_gatt_discover err %d", err);
+        if (err == -EBUSY) {
+            /* ZMK's split GATT discovery/subscription is still in progress;
+             * retry after a short delay rather than silently giving up. */
+            k_work_schedule(&info->discovery_work, K_MSEC(1000));
+        } else {
+            LOG_DBG("bt_gatt_discover err %d", err);
+        }
     }
 }
 

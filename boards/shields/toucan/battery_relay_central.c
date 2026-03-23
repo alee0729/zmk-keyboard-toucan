@@ -52,6 +52,7 @@ struct relay_conn_info {
     struct bt_conn *conn;
     uint16_t handle;           /* 0 = not yet discovered */
     bool discovering;
+    uint8_t retry_count;
     struct bt_gatt_discover_params discover_params;
     struct bt_uuid_128 discover_uuid; /* must outlive the discovery call */
     struct k_work_delayable discovery_work;
@@ -151,12 +152,14 @@ static void start_discovery(struct relay_conn_info *info) {
     int err = bt_gatt_discover(info->conn, &info->discover_params);
     if (err) {
         info->discovering = false;
-        if (err == -EBUSY) {
-            /* ZMK's split GATT discovery/subscription is still in progress;
-             * retry after a short delay rather than silently giving up. */
+        if ((err == -EBUSY || err == -ENOMEM || err == -EAGAIN) &&
+            info->retry_count < 5) {
+            /* GATT client busy (ZMK split discovery or other relay slot still
+             * in progress); back off and retry. */
+            info->retry_count++;
             k_work_schedule(&info->discovery_work, K_MSEC(1000));
         } else {
-            LOG_DBG("bt_gatt_discover err %d", err);
+            LOG_DBG("bt_gatt_discover err %d (retries %u)", err, info->retry_count);
         }
     }
 }
@@ -204,9 +207,11 @@ static void relay_connected(struct bt_conn *conn, uint8_t err) {
             relay_conns[i].conn        = bt_conn_ref(conn);
             relay_conns[i].handle      = 0;
             relay_conns[i].discovering = false;
-            /* Delay discovery so ZMK's split GATT discovery can finish */
+            relay_conns[i].retry_count = 0;
+            /* Stagger discovery per slot so simultaneous peripheral connections
+             * don't collide: slot 0 = 2 s, slot 1 = 4 s, etc. */
             k_work_schedule(&relay_conns[i].discovery_work,
-                            K_MSEC(RELAY_DISCOVERY_DELAY_MS));
+                            K_MSEC(RELAY_DISCOVERY_DELAY_MS * (1 + i)));
             break;
         }
     }
@@ -220,6 +225,7 @@ static void relay_disconnected(struct bt_conn *conn, uint8_t reason) {
             relay_conns[i].conn        = NULL;
             relay_conns[i].handle      = 0;
             relay_conns[i].discovering = false;
+            relay_conns[i].retry_count = 0;
             break;
         }
     }
@@ -270,6 +276,7 @@ static int display_relay_central_init(void) {
         relay_conns[i].conn        = NULL;
         relay_conns[i].handle      = 0;
         relay_conns[i].discovering = false;
+        relay_conns[i].retry_count = 0;
         k_work_init_delayable(&relay_conns[i].discovery_work, discovery_work_fn);
         battery_cache[i] = 0;
     }

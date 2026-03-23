@@ -22,7 +22,7 @@ manifest:
       revision: v0.3
     - name: zmk-dongle-screen
       remote: albertclee
-      revision: claude/fix-relay-battery-layer-zxnug
+      revision: new-display
       
   self:
     path: config

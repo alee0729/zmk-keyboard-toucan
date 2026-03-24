@@ -43,6 +43,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include "sleep.h"
 
 #include "layer.h"
+#include "../assets/custom_fonts.h"
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include "profile.h"
 #endif
@@ -227,8 +228,8 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     draw_battery_peripheral_status(canvas, state);
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    /* Diagnostic: show relay GATT write count in bottom-right corner.
-     * If this stays at 0, the dongle never writes to the left half's relay. */
+    /* Diagnostic: show relay GATT write count at bottom of screen.
+     * If R stays at 0, the dongle never writes to the left half's relay. */
     {
         extern volatile uint32_t relay_diag_write_count;
         char diag_buf[24];
@@ -237,11 +238,8 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
                  (unsigned)state->layer_index,
                  (unsigned)state->battery_p);
         lv_draw_label_dsc_t diag_dsc;
-        lv_draw_label_dsc_init(&diag_dsc);
-        diag_dsc.color = lv_color_black();
-        diag_dsc.font = lv_font_default();
-        diag_dsc.align = LV_TEXT_ALIGN_RIGHT;
-        lv_canvas_draw_text(canvas, 0, 110, SCREEN_WIDTH, &diag_dsc, diag_buf);
+        init_label_dsc(&diag_dsc, LVGL_FOREGROUND, &quinquefive_8, LV_TEXT_ALIGN_LEFT);
+        lv_canvas_draw_text(canvas, 2, 150, SCREEN_WIDTH - 4, &diag_dsc, diag_buf);
     }
 #endif
 }

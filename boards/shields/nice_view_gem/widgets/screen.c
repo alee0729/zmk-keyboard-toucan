@@ -314,14 +314,14 @@ static struct battery_peripheral_status_state battery_peripheral_status_get_stat
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     const struct zmk_peripheral_battery_state_changed *ev = as_zmk_peripheral_battery_state_changed(eh);
     return (struct battery_peripheral_status_state){
-        .source = ev->source,
-        .level = ev->state_of_charge,
+        .source = (ev != NULL) ? ev->source : 0,
+        .level = (ev != NULL) ? ev->state_of_charge : 0,
     };
 #else
     const struct zmk_battery_relay_state_changed *ev = as_zmk_battery_relay_state_changed(eh);
     return (struct battery_peripheral_status_state){
-        .source = ev->source,
-        .level = ev->state_of_charge,
+        .source = (ev != NULL) ? ev->source : 0,
+        .level = (ev != NULL) ? ev->state_of_charge : 0,
     };
 #endif
 }

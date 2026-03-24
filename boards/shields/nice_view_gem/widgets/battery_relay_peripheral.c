@@ -51,40 +51,42 @@ volatile uint32_t relay_diag_write_count;
 volatile int relay_diag_svc_status;
 
 /*
- * Event raising must NOT happen in the BT RX thread (GATT write callback) —
- * ZMK's event manager can deadlock there.  Instead, cache the data and
- * submit a work item to raise the event from the system work queue.
+ * Debounced event processing.
+ *
+ * The GATT write callback (BT RX thread) must NOT call into ZMK's event
+ * manager — doing so can deadlock.  Instead, the callback updates caches
+ * and sets dirty flags.  A delayed work item fires after a short debounce
+ * window and raises ONE event per dirty flag from the system work queue.
+ *
+ * This also coalesces rapid bursts (push_cached_state sends 3-4 writes
+ * back-to-back) into a single set of event raises.
  */
-static struct battery_relay_data pending_events[RELAY_MAX_SOURCES + 1]; /* +1 for layer */
-static volatile uint8_t pending_event_count;
+#define RELAY_DEBOUNCE_MS 100
 
-static void relay_event_work_handler(struct k_work *work);
-static K_WORK_DEFINE(relay_event_work, relay_event_work_handler);
+static volatile bool battery_dirty[RELAY_MAX_SOURCES];
+static volatile bool layer_dirty;
 
-static void relay_event_work_handler(struct k_work *work) {
-    struct battery_relay_data events[RELAY_MAX_SOURCES + 1];
-    uint8_t count;
+static void relay_debounce_work_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(relay_debounce_work, relay_debounce_work_handler);
 
-    /* Snapshot and clear under implicit assumption that BT RX won't
-     * preempt the system workqueue (cooperative threads). */
-    count = pending_event_count;
-    if (count > ARRAY_SIZE(events)) {
-        count = ARRAY_SIZE(events);
-    }
-    memcpy(events, (const void *)pending_events, count * sizeof(events[0]));
-    pending_event_count = 0;
-
-    for (uint8_t i = 0; i < count; i++) {
-        if (events[i].source == BATTERY_RELAY_SOURCE_LAYER) {
-            raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
-                .layer = events[i].level,
-            });
-        } else if (events[i].source < RELAY_MAX_SOURCES) {
+static void relay_debounce_work_handler(struct k_work *work) {
+    /* Raise one event per dirty source.  Events are processed synchronously
+     * by ZMK, so each is fully handled (and freed) before the next. */
+    for (int i = 0; i < RELAY_MAX_SOURCES; i++) {
+        if (battery_dirty[i]) {
+            battery_dirty[i] = false;
             raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
-                .source          = events[i].source,
-                .state_of_charge = events[i].level,
+                .source          = (uint8_t)i,
+                .state_of_charge = relay_battery_cache[i],
             });
         }
+    }
+
+    if (layer_dirty) {
+        layer_dirty = false;
+        raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
+            .layer = relay_layer_cache,
+        });
     }
 }
 
@@ -109,23 +111,22 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
     const struct battery_relay_data *data = buf;
     relay_diag_write_count++;
 
-    /* Update caches immediately (safe — just byte writes) */
+    /* Update caches and set dirty flags (safe — just byte writes) */
     if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
         relay_layer_cache = data->level;
+        layer_dirty = true;
         LOG_DBG("relay: layer %u", data->level);
     } else if (data->source < RELAY_MAX_SOURCES) {
         relay_battery_cache[data->source] = data->level;
+        battery_dirty[data->source] = true;
         LOG_DBG("relay: source %u battery %u%%", data->source, data->level);
     }
 
-    /* Queue event to be raised from system work queue (not BT RX thread) */
-    uint8_t idx = pending_event_count;
-    if (idx < ARRAY_SIZE(pending_events)) {
-        pending_events[idx].source = data->source;
-        pending_events[idx].level  = data->level;
-        pending_event_count = idx + 1;
-    }
-    k_work_submit(&relay_event_work);
+    /* Schedule (or reschedule) debounced event processing.
+     * k_work_reschedule resets the timer on each write, so a burst of
+     * 4 rapid writes results in only ONE work execution ~100ms after
+     * the last write. */
+    k_work_reschedule(&relay_debounce_work, K_MSEC(RELAY_DEBOUNCE_MS));
 
     return len;
 }

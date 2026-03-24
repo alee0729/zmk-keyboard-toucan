@@ -228,13 +228,27 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     draw_battery_peripheral_status(canvas, state);
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    /* Diagnostic: show relay GATT write count at bottom of screen.
-     * If R stays at 0, the dongle never writes to the left half's relay. */
+    /* Diagnostic: show relay write count + BLE connection count.
+     * R = relay writes received (0 = dongle never writes)
+     * C = active BLE connections (0 = dongle not connected)
+     * L = layer_index from state, B = battery_p from state */
     {
         extern volatile uint32_t relay_diag_write_count;
-        char diag_buf[24];
-        snprintf(diag_buf, sizeof(diag_buf), "R:%u L:%u B:%u",
+
+        /* Count active BLE connections */
+        int conn_count = 0;
+        for (int i = 0; i < CONFIG_BT_MAX_CONN; i++) {
+            struct bt_conn *c = bt_conn_lookup_index(i);
+            if (c) {
+                conn_count++;
+                bt_conn_unref(c);
+            }
+        }
+
+        char diag_buf[32];
+        snprintf(diag_buf, sizeof(diag_buf), "R:%u C:%d L:%u B:%u",
                  (unsigned)relay_diag_write_count,
+                 conn_count,
                  (unsigned)state->layer_index,
                  (unsigned)state->battery_p);
         lv_draw_label_dsc_t diag_dsc;

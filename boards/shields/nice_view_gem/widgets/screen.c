@@ -338,6 +338,7 @@ ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_battery_relay_state_chang
 /* Layer status */
 
 static void set_layer_status(struct zmk_widget_screen *widget, struct layer_status_state state) {
+    LOG_INF("set_layer_status: index=%u (was %u)", state.index, widget->state.layer_index);
     widget->state.layer_index = state.index;
     draw_top(widget->obj, widget->cbuf, &widget->state);
 }

@@ -69,10 +69,13 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
     /* Layer data is multiplexed through source=0xFE */
     if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
         relay_layer_cache = data->level;
-        LOG_DBG("relay: layer %u", data->level);
-        raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
+        LOG_INF("relay: layer update received, index=%u", data->level);
+        int rc = raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
             .layer = data->level,
         });
+        if (rc) {
+            LOG_WRN("relay: raise layer event failed: %d", rc);
+        }
         return len;
     }
 

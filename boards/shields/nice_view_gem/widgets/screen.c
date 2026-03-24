@@ -228,12 +228,11 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     draw_battery_peripheral_status(canvas, state);
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    /* Diagnostic: show relay write count + BLE connection count.
-     * R = relay writes received (0 = dongle never writes)
-     * C = active BLE connections (0 = dongle not connected)
-     * L = layer_index from state, B = battery_p from state */
+    /* Diagnostic: S = GATT svc status (1=OK, neg=error), R = relay writes,
+     * C = BLE connections, L = layer, B = battery */
     {
         extern volatile uint32_t relay_diag_write_count;
+        extern volatile int relay_diag_svc_status;
 
         /* Count active BLE connections */
         int conn_count = 0;
@@ -245,12 +244,12 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
             }
         }
 
-        char diag_buf[32];
-        snprintf(diag_buf, sizeof(diag_buf), "R:%u C:%d L:%u B:%u",
+        char diag_buf[40];
+        snprintf(diag_buf, sizeof(diag_buf), "S:%d R:%u C:%d L:%u",
+                 (int)relay_diag_svc_status,
                  (unsigned)relay_diag_write_count,
                  conn_count,
-                 (unsigned)state->layer_index,
-                 (unsigned)state->battery_p);
+                 (unsigned)state->layer_index);
         lv_draw_label_dsc_t diag_dsc;
         init_label_dsc(&diag_dsc, LVGL_FOREGROUND, &quinquefive_8, LV_TEXT_ALIGN_LEFT);
         lv_canvas_draw_text(canvas, 2, 150, SCREEN_WIDTH - 4, &diag_dsc, diag_buf);

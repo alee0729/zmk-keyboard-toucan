@@ -18,6 +18,7 @@
  */
 
 #include <zephyr/kernel.h>
+#include <zephyr/init.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
@@ -40,6 +41,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 static uint8_t relay_battery_cache[RELAY_MAX_SOURCES];
 static uint8_t relay_layer_cache;
 volatile uint32_t relay_diag_write_count;
+/* 0 = not attempted, 1 = registered OK, negative = error code */
+volatile int relay_diag_svc_status;
 
 uint8_t zmk_battery_relay_get_level(uint8_t source) {
     if (source >= RELAY_MAX_SOURCES) {
@@ -99,10 +102,29 @@ static struct bt_uuid_128 relay_svc_uuid =
 static struct bt_uuid_128 relay_char_uuid =
     BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x6e400011, 0xb5a3, 0xf393, 0xe0a9, 0xe50e24dcca9e));
 
-BT_GATT_SERVICE_DEFINE(battery_relay_svc,
+/* Dynamic GATT service registration — static BT_GATT_SERVICE_DEFINE was
+ * not making it into the GATT table (likely a linker/section issue).
+ * Use bt_gatt_service_register() at boot instead. */
+static struct bt_gatt_attr relay_attrs[] = {
     BT_GATT_PRIMARY_SERVICE(&relay_svc_uuid),
     BT_GATT_CHARACTERISTIC(&relay_char_uuid.uuid,
                            BT_GATT_CHRC_WRITE_WITHOUT_RESP,
                            BT_GATT_PERM_WRITE,
                            NULL, relay_write_cb, NULL),
-);
+};
+
+static struct bt_gatt_service relay_svc = BT_GATT_SERVICE(relay_attrs);
+
+static int relay_peripheral_init(void) {
+    int err = bt_gatt_service_register(&relay_svc);
+    relay_diag_svc_status = err ? err : 1;
+    if (err) {
+        LOG_ERR("relay: bt_gatt_service_register failed: %d", err);
+    } else {
+        LOG_INF("relay: GATT service registered OK (%u attrs)",
+                (unsigned)relay_svc.attr_count);
+    }
+    return err;
+}
+
+SYS_INIT(relay_peripheral_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);

@@ -104,7 +104,7 @@ static struct bt_uuid_128 relay_char_uuid =
 
 /* Dynamic GATT service registration — static BT_GATT_SERVICE_DEFINE was
  * not making it into the GATT table (likely a linker/section issue).
- * Use bt_gatt_service_register() at boot instead. */
+ * Use bt_gatt_service_register() via delayed work to ensure BT is ready. */
 static struct bt_gatt_attr relay_attrs[] = {
     BT_GATT_PRIMARY_SERVICE(&relay_svc_uuid),
     BT_GATT_CHARACTERISTIC(&relay_char_uuid.uuid,
@@ -115,7 +115,16 @@ static struct bt_gatt_attr relay_attrs[] = {
 
 static struct bt_gatt_service relay_svc = BT_GATT_SERVICE(relay_attrs);
 
-static int relay_peripheral_init(void) {
+static void relay_register_work_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(relay_register_work, relay_register_work_handler);
+
+static void relay_register_work_handler(struct k_work *work) {
+    if (!bt_is_ready()) {
+        /* BT not ready yet — retry in 200 ms */
+        k_work_reschedule(&relay_register_work, K_MSEC(200));
+        return;
+    }
+
     int err = bt_gatt_service_register(&relay_svc);
     relay_diag_svc_status = err ? err : 1;
     if (err) {
@@ -124,7 +133,12 @@ static int relay_peripheral_init(void) {
         LOG_INF("relay: GATT service registered OK (%u attrs)",
                 (unsigned)relay_svc.attr_count);
     }
-    return err;
+}
+
+static int relay_peripheral_init(void) {
+    /* Defer registration until BT subsystem is ready */
+    k_work_schedule(&relay_register_work, K_MSEC(500));
+    return 0;
 }
 
 SYS_INIT(relay_peripheral_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);

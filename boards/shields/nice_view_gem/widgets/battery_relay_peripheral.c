@@ -18,7 +18,6 @@
  */
 
 #include <zephyr/kernel.h>
-#include <zephyr/init.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
@@ -59,59 +58,7 @@ struct battery_relay_data {
 } __packed;
 
 /* -------------------------------------------------------------------------
- * Deferred event processing via polling timer
- *
- * GATT write callbacks run in the BT RX thread context.  Raising ZMK
- * events synchronously there blocks the BLE host stack, which prevents
- * HID keypress notifications from being sent to the central.
- *
- * We use a self-rescheduling k_work_delayable timer (200 ms) that polls
- * a message queue for incoming relay data.  The GATT callback only does
- * a k_msgq_put (ISR-safe) — no k_work_submit from BT context needed.
- * ---------------------------------------------------------------------- */
-
-#define RELAY_POLL_INTERVAL_MS 200
-
-K_MSGQ_DEFINE(relay_msgq, sizeof(struct battery_relay_data), 8, 1);
-
-static void relay_poll_handler(struct k_work *work);
-static K_WORK_DELAYABLE_DEFINE(relay_poll_work, relay_poll_handler);
-
-static void relay_poll_handler(struct k_work *work) {
-    struct battery_relay_data data;
-
-    while (k_msgq_get(&relay_msgq, &data, K_NO_WAIT) == 0) {
-        if (data.source == BATTERY_RELAY_SOURCE_LAYER) {
-            relay_layer_cache = data.level;
-            LOG_DBG("relay: layer %u", data.level);
-            raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
-                .layer = data.level,
-            });
-            continue;
-        }
-
-        if (data.source < RELAY_MAX_SOURCES) {
-            relay_battery_cache[data.source] = data.level;
-            LOG_DBG("relay: source %u battery %u%%", data.source, data.level);
-            raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
-                .source          = data.source,
-                .state_of_charge = data.level,
-            });
-        }
-    }
-
-    /* Reschedule — runs continuously from boot */
-    k_work_schedule(&relay_poll_work, K_MSEC(RELAY_POLL_INTERVAL_MS));
-}
-
-static int relay_poll_init(void) {
-    k_work_schedule(&relay_poll_work, K_MSEC(RELAY_POLL_INTERVAL_MS));
-    return 0;
-}
-SYS_INIT(relay_poll_init, APPLICATION, 99);
-
-/* -------------------------------------------------------------------------
- * GATT write handler — returns immediately, data picked up by poll timer
+ * GATT write handler — raises events directly
  * ---------------------------------------------------------------------- */
 
 static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
@@ -123,9 +70,24 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
 
     const struct battery_relay_data *data = buf;
 
-    /* Queue data — poll timer will pick it up and raise events */
-    if (k_msgq_put(&relay_msgq, data, K_NO_WAIT) != 0) {
-        LOG_WRN("relay: message queue full, dropping data");
+    /* Layer data is multiplexed through source=0xFE */
+    if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
+        relay_layer_cache = data->level;
+        LOG_INF("relay_periph: layer=%u", data->level);
+        raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
+            .layer = data->level,
+        });
+        return len;
+    }
+
+    /* Battery data */
+    if (data->source < RELAY_MAX_SOURCES) {
+        relay_battery_cache[data->source] = data->level;
+        LOG_INF("relay_periph: source=%u battery=%u%%", data->source, data->level);
+        raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
+            .source          = data->source,
+            .state_of_charge = data->level,
+        });
     }
 
     return len;

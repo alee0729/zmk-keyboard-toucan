@@ -57,6 +57,49 @@ struct battery_relay_data {
     uint8_t level;
 } __packed;
 
+/* -------------------------------------------------------------------------
+ * Deferred event processing
+ *
+ * GATT write callbacks run in the BT RX thread context.  Raising ZMK
+ * events synchronously there blocks the BLE host stack, which prevents
+ * HID keypress notifications from being sent to the central.  To avoid
+ * this contention we queue incoming relay data and process it from the
+ * system work queue instead.
+ * ---------------------------------------------------------------------- */
+
+K_MSGQ_DEFINE(relay_msgq, sizeof(struct battery_relay_data), 8, 1);
+
+static void relay_process_handler(struct k_work *work);
+static K_WORK_DEFINE(relay_process_work, relay_process_handler);
+
+static void relay_process_handler(struct k_work *work) {
+    struct battery_relay_data data;
+
+    while (k_msgq_get(&relay_msgq, &data, K_NO_WAIT) == 0) {
+        if (data.source == BATTERY_RELAY_SOURCE_LAYER) {
+            relay_layer_cache = data.level;
+            LOG_DBG("relay: layer %u", data.level);
+            raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
+                .layer = data.level,
+            });
+            continue;
+        }
+
+        if (data.source < RELAY_MAX_SOURCES) {
+            relay_battery_cache[data.source] = data.level;
+            LOG_DBG("relay: source %u battery %u%%", data.source, data.level);
+            raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
+                .source          = data.source,
+                .state_of_charge = data.level,
+            });
+        }
+    }
+}
+
+/* -------------------------------------------------------------------------
+ * GATT write handler — returns immediately, defers event processing
+ * ---------------------------------------------------------------------- */
+
 static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                const void *buf, uint16_t len, uint16_t offset, uint8_t flags) {
     if (len != sizeof(struct battery_relay_data)) {
@@ -66,24 +109,11 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
 
     const struct battery_relay_data *data = buf;
 
-    /* Layer data is multiplexed through source=0xFE */
-    if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
-        relay_layer_cache = data->level;
-        LOG_DBG("relay: layer %u", data->level);
-        raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
-            .layer = data->level,
-        });
-        return len;
-    }
-
-    /* Battery data */
-    if (data->source < RELAY_MAX_SOURCES) {
-        relay_battery_cache[data->source] = data->level;
-        LOG_DBG("relay: source %u battery %u%%", data->source, data->level);
-        raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
-            .source          = data->source,
-            .state_of_charge = data->level,
-        });
+    /* Queue data for deferred processing outside BT RX thread */
+    if (k_msgq_put(&relay_msgq, data, K_NO_WAIT) != 0) {
+        LOG_WRN("relay: message queue full, dropping data");
+    } else {
+        k_work_submit(&relay_process_work);
     }
 
     return len;

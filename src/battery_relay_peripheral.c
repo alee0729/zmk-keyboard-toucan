@@ -62,7 +62,52 @@ uint8_t battery_relay_get_layer(void) {
 }
 
 /* -------------------------------------------------------------------------
- * GATT write handler
+ * Deferred event processing
+ *
+ * GATT write callbacks run in the BT RX thread context.  Raising ZMK
+ * events synchronously there blocks the BLE host stack, which prevents
+ * HID keypress notifications from being sent to the central.  To avoid
+ * this contention we queue incoming relay data and process it from the
+ * system work queue instead.
+ * ---------------------------------------------------------------------- */
+
+K_MSGQ_DEFINE(relay_msgq, sizeof(struct battery_relay_data), 8, 1);
+
+static void relay_process_handler(struct k_work *work);
+static K_WORK_DEFINE(relay_process_work, relay_process_handler);
+
+static void relay_process_handler(struct k_work *work) {
+    struct battery_relay_data data;
+
+    while (k_msgq_get(&relay_msgq, &data, K_NO_WAIT) == 0) {
+        if (data.source == BATTERY_RELAY_SOURCE_LAYER) {
+            relayed_layer = data.level;
+            LOG_DBG("relay: layer=%u", relayed_layer);
+            raise_zmk_layer_state_changed((struct zmk_layer_state_changed){
+                .layer = relayed_layer,
+                .state = true,
+                .timestamp = k_uptime_get(),
+            });
+            continue;
+        }
+
+        if (data.source >= CONFIG_DONGLE_SCREEN_BATTERY_RELAY_SOURCE_COUNT) {
+            continue;
+        }
+
+        relay_cache[data.source] = data.level;
+        LOG_DBG("battery_relay: source=%u level=%u%%", data.source, data.level);
+
+        raise_zmk_peripheral_battery_state_changed(
+            (struct zmk_peripheral_battery_state_changed){
+                .source = data.source,
+                .state_of_charge = data.level,
+            });
+    }
+}
+
+/* -------------------------------------------------------------------------
+ * GATT write handler — returns immediately, defers event processing
  * ---------------------------------------------------------------------- */
 
 static ssize_t battery_relay_write_cb(struct bt_conn *conn,
@@ -76,46 +121,18 @@ static ssize_t battery_relay_write_cb(struct bt_conn *conn,
     }
 
     const struct battery_relay_data *data = buf;
-    LOG_INF("relay_periph: write received source=%u level=%u", data->source, data->level);
 
     /* Ignore the dongle's own battery (no slot for it on peripheral display) */
     if (data->source == BATTERY_RELAY_SOURCE_DONGLE) {
         return len;
     }
 
-    /* Layer data is multiplexed through this characteristic.
-     * source=0xFE means level contains the active layer index.
-     * Store it and raise zmk_layer_state_changed so the layer_status
-     * widget redraws with the relayed value. */
-    if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
-        relayed_layer = data->level;
-        LOG_DBG("relay: layer=%u", relayed_layer);
-        raise_zmk_layer_state_changed((struct zmk_layer_state_changed){
-            .layer = relayed_layer,
-            .state = true,
-            .timestamp = k_uptime_get(),
-        });
-        return len;
+    /* Queue data for deferred processing outside BT RX thread */
+    if (k_msgq_put(&relay_msgq, data, K_NO_WAIT) != 0) {
+        LOG_WRN("battery_relay: message queue full, dropping relay data");
+    } else {
+        k_work_submit(&relay_process_work);
     }
-
-    if (data->source >= CONFIG_DONGLE_SCREEN_BATTERY_RELAY_SOURCE_COUNT) {
-        LOG_WRN("battery_relay: source %u out of range (max %d)",
-                data->source, CONFIG_DONGLE_SCREEN_BATTERY_RELAY_SOURCE_COUNT - 1);
-        return len;
-    }
-
-    relay_cache[data->source] = data->level;
-
-    LOG_DBG("battery_relay: source=%u level=%u%%", data->source, data->level);
-
-    /*
-     * Re-raise as zmk_peripheral_battery_state_changed so the battery_status
-     * widget redraws — it already subscribes to this event unconditionally.
-     */
-    raise_zmk_peripheral_battery_state_changed((struct zmk_peripheral_battery_state_changed){
-        .source = data->source,
-        .state_of_charge = data->level,
-    });
 
     return len;
 }

@@ -7,15 +7,16 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/event_manager.h>
 #include <zmk/events/activity_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
+#include <zmk/events/split_peripheral_status_changed.h>
+#include <zmk/battery.h>
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zmk/events/layer_state_changed.h>
 #endif
-#include <zmk/events/split_peripheral_status_changed.h>
-#include <zmk/battery.h>
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zephyr/bluetooth/conn.h>
 #include "../events/battery_relay_state_changed.h"
 #include "../events/layer_relay_state_changed.h"
+#include "battery_relay_peripheral.h"
 #endif
 #include <zmk/display.h>
 #include <zmk/display/widgets/battery_status.h>
@@ -362,13 +363,13 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
 
-#else /* Peripheral role: use layer relay from dongle */
+#else /* Peripheral role: use locally cached relayed layer */
 
 static struct layer_status_state layer_relay_status_get_state(const zmk_event_t *eh) {
     const struct zmk_layer_relay_state_changed *ev = as_zmk_layer_relay_state_changed(eh);
 
     return (struct layer_status_state){
-        .index = (ev != NULL) ? ev->layer : 0,
+        .index = (ev != NULL) ? ev->layer : zmk_layer_relay_get_index(),
     };
 }
 

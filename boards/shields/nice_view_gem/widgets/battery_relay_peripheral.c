@@ -58,21 +58,25 @@ struct battery_relay_data {
 } __packed;
 
 /* -------------------------------------------------------------------------
- * Deferred event processing
+ * Deferred event processing via polling timer
  *
  * GATT write callbacks run in the BT RX thread context.  Raising ZMK
  * events synchronously there blocks the BLE host stack, which prevents
- * HID keypress notifications from being sent to the central.  To avoid
- * this contention we queue incoming relay data and process it from the
- * system work queue instead.
+ * HID keypress notifications from being sent to the central.
+ *
+ * We use a self-rescheduling k_work_delayable timer (200 ms) that polls
+ * a message queue for incoming relay data.  The GATT callback only does
+ * a k_msgq_put (ISR-safe) — no k_work_submit from BT context needed.
  * ---------------------------------------------------------------------- */
+
+#define RELAY_POLL_INTERVAL_MS 200
 
 K_MSGQ_DEFINE(relay_msgq, sizeof(struct battery_relay_data), 8, 1);
 
-static void relay_process_handler(struct k_work *work);
-static K_WORK_DEFINE(relay_process_work, relay_process_handler);
+static void relay_poll_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(relay_poll_work, relay_poll_handler);
 
-static void relay_process_handler(struct k_work *work) {
+static void relay_poll_handler(struct k_work *work) {
     struct battery_relay_data data;
 
     while (k_msgq_get(&relay_msgq, &data, K_NO_WAIT) == 0) {
@@ -94,10 +98,19 @@ static void relay_process_handler(struct k_work *work) {
             });
         }
     }
+
+    /* Reschedule — runs continuously from boot */
+    k_work_schedule(&relay_poll_work, K_MSEC(RELAY_POLL_INTERVAL_MS));
 }
 
+static int relay_poll_init(void) {
+    k_work_schedule(&relay_poll_work, K_MSEC(RELAY_POLL_INTERVAL_MS));
+    return 0;
+}
+SYS_INIT(relay_poll_init, APPLICATION, 99);
+
 /* -------------------------------------------------------------------------
- * GATT write handler — returns immediately, defers event processing
+ * GATT write handler — returns immediately, data picked up by poll timer
  * ---------------------------------------------------------------------- */
 
 static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
@@ -109,11 +122,9 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
 
     const struct battery_relay_data *data = buf;
 
-    /* Queue data for deferred processing outside BT RX thread */
+    /* Queue data — poll timer will pick it up and raise events */
     if (k_msgq_put(&relay_msgq, data, K_NO_WAIT) != 0) {
         LOG_WRN("relay: message queue full, dropping data");
-    } else {
-        k_work_submit(&relay_process_work);
     }
 
     return len;

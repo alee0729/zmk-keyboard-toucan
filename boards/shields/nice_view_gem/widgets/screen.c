@@ -7,12 +7,16 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/event_manager.h>
 #include <zmk/events/activity_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
-#include <zmk/events/layer_state_changed.h>
 #include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/battery.h>
+#include <zmk/keymap.h>
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+#include <zmk/events/layer_state_changed.h>
+#endif
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zephyr/bluetooth/conn.h>
 #include "../events/battery_relay_state_changed.h"
+#include "../events/layer_relay_state_changed.h"
 #endif
 #include <zmk/display.h>
 #include <zmk/display/widgets/battery_status.h>
@@ -24,7 +28,6 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 /* Output/profile APIs are only linked for non-split or split-central builds. */
-#include <zmk/keymap.h>
 #include <zmk/events/ble_active_profile_changed.h>
 #include <zmk/events/endpoint_changed.h>
 #include <zmk/events/wpm_state_changed.h>
@@ -344,6 +347,8 @@ static void layer_status_update_cb(struct layer_status_state state) {
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) { set_layer_status(widget, state); }
 }
 
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+
 static struct layer_status_state layer_status_get_state(const zmk_event_t *eh) {
     const struct zmk_layer_state_changed *ev = as_zmk_layer_state_changed(eh);
 
@@ -356,6 +361,23 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
                             layer_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
+
+#else /* Peripheral role: use layer relay from dongle */
+
+static struct layer_status_state layer_relay_status_get_state(const zmk_event_t *eh) {
+    const struct zmk_layer_relay_state_changed *ev = as_zmk_layer_relay_state_changed(eh);
+
+    return (struct layer_status_state){
+        .index = (ev != NULL) ? ev->layer : 0,
+    };
+}
+
+ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, layer_status_update_cb,
+                            layer_relay_status_get_state)
+
+ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_relay_state_changed);
+
+#endif /* !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) */
 
 /**
  * Role-specific widgets: output status (central/non-split), connection status (peripheral split)
@@ -474,6 +496,14 @@ static void force_redraw_all_widgets(void) {
     }
 }
 
+#if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+static void refresh_layer_state_from_local_shield(void) {
+    layer_status_update_cb((struct layer_status_state){
+        .index = zmk_keymap_highest_layer_active(),
+    });
+}
+#endif
+
 static int display_activity_event_handler(const zmk_event_t *eh) {
     struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
     if (ev == NULL) {
@@ -483,6 +513,9 @@ static int display_activity_event_handler(const zmk_event_t *eh) {
     switch (ev->state) {
     case ZMK_ACTIVITY_ACTIVE:
         set_sleep_screen_active(false);
+#if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+        refresh_layer_state_from_local_shield();
+#endif
         break;
     case ZMK_ACTIVITY_SLEEP:
         set_sleep_screen_active(true);

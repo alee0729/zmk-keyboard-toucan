@@ -7,15 +7,12 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/event_manager.h>
 #include <zmk/events/activity_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zmk/events/layer_state_changed.h>
-#endif
 #include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/battery.h>
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zephyr/bluetooth/conn.h>
 #include "../events/battery_relay_state_changed.h"
-#include "../events/layer_relay_state_changed.h"
 #endif
 #include <zmk/display.h>
 #include <zmk/display/widgets/battery_status.h>
@@ -347,8 +344,6 @@ static void layer_status_update_cb(struct layer_status_state state) {
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) { set_layer_status(widget, state); }
 }
 
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-
 static struct layer_status_state layer_status_get_state(const zmk_event_t *eh) {
     const struct zmk_layer_state_changed *ev = as_zmk_layer_state_changed(eh);
 
@@ -361,23 +356,6 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
                             layer_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
-
-#else /* Peripheral role: use layer relay from dongle */
-
-static struct layer_status_state layer_relay_status_get_state(const zmk_event_t *eh) {
-    const struct zmk_layer_relay_state_changed *ev = as_zmk_layer_relay_state_changed(eh);
-
-    return (struct layer_status_state){
-        .index = (ev != NULL) ? ev->layer : 0,
-    };
-}
-
-ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, layer_status_update_cb,
-                            layer_relay_status_get_state)
-
-ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_relay_state_changed);
-
-#endif /* !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) */
 
 /**
  * Role-specific widgets: output status (central/non-split), connection status (peripheral split)

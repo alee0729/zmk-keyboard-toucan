@@ -39,6 +39,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 static uint8_t relay_battery_cache[RELAY_MAX_SOURCES];
 static uint8_t relay_layer_cache;
+volatile uint32_t relay_diag_write_count;
 
 uint8_t zmk_battery_relay_get_level(uint8_t source) {
     if (source >= RELAY_MAX_SOURCES) {
@@ -65,6 +66,7 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
     }
 
     const struct battery_relay_data *data = buf;
+    relay_diag_write_count++;
 
     /* Layer data is multiplexed through source=0xFE */
     if (data->source == BATTERY_RELAY_SOURCE_LAYER) {

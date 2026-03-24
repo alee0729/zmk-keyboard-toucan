@@ -225,6 +225,25 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
 #endif
     draw_battery_status(canvas, state);
     draw_battery_peripheral_status(canvas, state);
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    /* Diagnostic: show relay GATT write count in bottom-right corner.
+     * If this stays at 0, the dongle never writes to the left half's relay. */
+    {
+        extern volatile uint32_t relay_diag_write_count;
+        char diag_buf[24];
+        snprintf(diag_buf, sizeof(diag_buf), "R:%u L:%u B:%u",
+                 (unsigned)relay_diag_write_count,
+                 (unsigned)state->layer_index,
+                 (unsigned)state->battery_p);
+        lv_draw_label_dsc_t diag_dsc;
+        lv_draw_label_dsc_init(&diag_dsc);
+        diag_dsc.color = lv_color_black();
+        diag_dsc.font = lv_font_default();
+        diag_dsc.align = LV_TEXT_ALIGN_RIGHT;
+        lv_canvas_draw_text(canvas, 0, 110, SCREEN_WIDTH, &diag_dsc, diag_buf);
+    }
+#endif
 }
 
 /**

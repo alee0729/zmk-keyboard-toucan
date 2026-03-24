@@ -21,6 +21,7 @@
  */
 
 #include <zephyr/kernel.h>
+#include <zephyr/init.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
 

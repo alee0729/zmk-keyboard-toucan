@@ -117,7 +117,7 @@ static int relay_poll_init(void) {
     k_work_schedule(&relay_poll_work, K_MSEC(RELAY_POLL_INTERVAL_MS));
     return 0;
 }
-SYS_INIT(relay_poll_init, APPLICATION, 99);
+SYS_INIT(relay_poll_init, APPLICATION);
 
 /* -------------------------------------------------------------------------
  * GATT write handler — returns immediately, data picked up by poll timer

@@ -38,11 +38,55 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 /* source value indicating layer data instead of battery data */
 #define BATTERY_RELAY_SOURCE_LAYER 0xFE
 
+/* Payload written by the dongle — must match battery_relay_central.h */
+struct battery_relay_data {
+    uint8_t source;
+    uint8_t level;
+} __packed;
+
 static uint8_t relay_battery_cache[RELAY_MAX_SOURCES];
 static uint8_t relay_layer_cache;
 volatile uint32_t relay_diag_write_count;
 /* 0 = not attempted, 1 = registered OK, negative = error code */
 volatile int relay_diag_svc_status;
+
+/*
+ * Event raising must NOT happen in the BT RX thread (GATT write callback) —
+ * ZMK's event manager can deadlock there.  Instead, cache the data and
+ * submit a work item to raise the event from the system work queue.
+ */
+static struct battery_relay_data pending_events[RELAY_MAX_SOURCES + 1]; /* +1 for layer */
+static volatile uint8_t pending_event_count;
+
+static void relay_event_work_handler(struct k_work *work);
+static K_WORK_DEFINE(relay_event_work, relay_event_work_handler);
+
+static void relay_event_work_handler(struct k_work *work) {
+    struct battery_relay_data events[RELAY_MAX_SOURCES + 1];
+    uint8_t count;
+
+    /* Snapshot and clear under implicit assumption that BT RX won't
+     * preempt the system workqueue (cooperative threads). */
+    count = pending_event_count;
+    if (count > ARRAY_SIZE(events)) {
+        count = ARRAY_SIZE(events);
+    }
+    memcpy(events, (const void *)pending_events, count * sizeof(events[0]));
+    pending_event_count = 0;
+
+    for (uint8_t i = 0; i < count; i++) {
+        if (events[i].source == BATTERY_RELAY_SOURCE_LAYER) {
+            raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
+                .layer = events[i].level,
+            });
+        } else if (events[i].source < RELAY_MAX_SOURCES) {
+            raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
+                .source          = events[i].source,
+                .state_of_charge = events[i].level,
+            });
+        }
+    }
+}
 
 uint8_t zmk_battery_relay_get_level(uint8_t source) {
     if (source >= RELAY_MAX_SOURCES) {
@@ -55,12 +99,6 @@ uint8_t zmk_layer_relay_get_index(void) {
     return relay_layer_cache;
 }
 
-/* Payload written by the dongle — must match battery_relay_central.h */
-struct battery_relay_data {
-    uint8_t source;
-    uint8_t level;
-} __packed;
-
 static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                const void *buf, uint16_t len, uint16_t offset, uint8_t flags) {
     if (len != sizeof(struct battery_relay_data)) {
@@ -71,25 +109,23 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
     const struct battery_relay_data *data = buf;
     relay_diag_write_count++;
 
-    /* Layer data is multiplexed through source=0xFE */
+    /* Update caches immediately (safe — just byte writes) */
     if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
         relay_layer_cache = data->level;
         LOG_DBG("relay: layer %u", data->level);
-        raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
-            .layer = data->level,
-        });
-        return len;
-    }
-
-    /* Battery data */
-    if (data->source < RELAY_MAX_SOURCES) {
+    } else if (data->source < RELAY_MAX_SOURCES) {
         relay_battery_cache[data->source] = data->level;
         LOG_DBG("relay: source %u battery %u%%", data->source, data->level);
-        raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
-            .source          = data->source,
-            .state_of_charge = data->level,
-        });
     }
+
+    /* Queue event to be raised from system work queue (not BT RX thread) */
+    uint8_t idx = pending_event_count;
+    if (idx < ARRAY_SIZE(pending_events)) {
+        pending_events[idx].source = data->source;
+        pending_events[idx].level  = data->level;
+        pending_event_count = idx + 1;
+    }
+    k_work_submit(&relay_event_work);
 
     return len;
 }

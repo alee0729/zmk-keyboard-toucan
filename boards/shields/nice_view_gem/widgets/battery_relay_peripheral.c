@@ -57,10 +57,6 @@ struct battery_relay_data {
     uint8_t level;
 } __packed;
 
-/* -------------------------------------------------------------------------
- * GATT write handler — raises events directly
- * ---------------------------------------------------------------------- */
-
 static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                const void *buf, uint16_t len, uint16_t offset, uint8_t flags) {
     if (len != sizeof(struct battery_relay_data)) {
@@ -73,7 +69,7 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
     /* Layer data is multiplexed through source=0xFE */
     if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
         relay_layer_cache = data->level;
-        LOG_INF("relay_periph: layer=%u", data->level);
+        LOG_DBG("relay: layer %u", data->level);
         raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
             .layer = data->level,
         });
@@ -83,7 +79,7 @@ static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
     /* Battery data */
     if (data->source < RELAY_MAX_SOURCES) {
         relay_battery_cache[data->source] = data->level;
-        LOG_INF("relay_periph: source=%u battery=%u%%", data->source, data->level);
+        LOG_DBG("relay: source %u battery %u%%", data->source, data->level);
         raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
             .source          = data->source,
             .state_of_charge = data->level,

@@ -25,7 +25,6 @@
 #include <zephyr/logging/log.h>
 
 #include <zmk/event_manager.h>
-#include <zmk/events/layer_state_changed.h>
 
 #include "battery_relay_central.h"
 
@@ -83,15 +82,13 @@ static ssize_t battery_relay_write_cb(struct bt_conn *conn,
     }
 
     /* Layer data is multiplexed through this characteristic.
-     * source=0xFE means level contains the active layer index. */
+     * source=0xFE means level contains the active layer index.
+     * We only cache it here — the display polls via battery_relay_get_layer().
+     * Do NOT raise zmk_layer_state_changed from BT context; it causes a
+     * hard crash because event listeners touch LVGL / keymap state. */
     if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
         relayed_layer = data->level;
         LOG_INF("relay_periph: layer=%u", relayed_layer);
-        raise_zmk_layer_state_changed((struct zmk_layer_state_changed){
-            .layer = relayed_layer,
-            .state = true,
-            .timestamp = k_uptime_get(),
-        });
         return len;
     }
 

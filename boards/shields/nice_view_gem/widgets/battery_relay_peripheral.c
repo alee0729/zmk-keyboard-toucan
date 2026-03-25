@@ -8,14 +8,15 @@
  * Display Relay — peripheral (left half) side.
  *
  * The dongle discovers this GATT characteristic and writes battery_relay_data
- * packets.  Battery data (source 0..N) updates battery cache and raises
- * zmk_battery_relay_state_changed.  Layer data (source = 0xFE) updates layer
- * cache and raises zmk_layer_relay_state_changed.
+ * packets.  The callback updates simple caches — no ZMK events, no work
+ * queues, no LVGL calls.  The display polls these caches via an LVGL timer
+ * in screen.c, keeping this code completely isolated from the event and
+ * display subsystems.
  *
- * IMPORTANT: Event raising runs on a dedicated low-priority work queue thread,
- * NOT the system work queue.  The BT stack relies on the system work queue for
- * TX buffer completion; blocking it with display/event work starves key
- * notification sends and causes the keyboard to lock up.
+ * Previous approaches that raised ZMK events (directly, via system work
+ * queue, or via a dedicated work queue) all caused the keyboard to lock up
+ * because the event → display listener → LVGL path interfered with BT
+ * operations.
  *
  * UUID pair must match battery_relay_central.h in the toucan shield:
  *   Service  6e400010-b5a3-f393-e0a9-e50e24dcca9e
@@ -27,13 +28,6 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
-
-#include <zmk/event_manager.h>
-#include "../events/battery_relay_state_changed.h"
-#include "../events/layer_relay_state_changed.h"
-
-ZMK_EVENT_IMPL(zmk_battery_relay_state_changed);
-ZMK_EVENT_IMPL(zmk_layer_relay_state_changed);
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -55,57 +49,6 @@ volatile uint32_t relay_diag_write_count;
 /* 0 = not attempted, 1 = registered OK, negative = error code */
 volatile int relay_diag_svc_status;
 
-/* -------------------------------------------------------------------------
- * Dedicated work queue for relay event processing.
- *
- * The BT stack uses the system work queue for critical operations like
- * TX buffer completion.  If we raise ZMK events (which trigger display
- * redraws via LVGL) on the system work queue, we block those BT operations
- * and starve key notification sends.
- *
- * Running relay event work on a separate low-priority thread avoids this.
- * ----------------------------------------------------------------------- */
-#define RELAY_WORKQ_STACK_SIZE 2048
-#define RELAY_WORKQ_PRIORITY  K_PRIO_PREEMPT(10)
-
-K_THREAD_STACK_DEFINE(relay_workq_stack, RELAY_WORKQ_STACK_SIZE);
-static struct k_work_q relay_work_q;
-static bool relay_work_q_started;
-
-/*
- * Debounced event processing.
- *
- * The GATT write callback (BT RX thread) updates caches and sets dirty
- * flags.  A delayed work item fires after a short debounce window and
- * raises ONE event per dirty flag from the dedicated relay work queue.
- */
-#define RELAY_DEBOUNCE_MS 50
-
-static volatile bool battery_dirty[RELAY_MAX_SOURCES];
-static volatile bool layer_dirty;
-
-static void relay_debounce_work_handler(struct k_work *work);
-static K_WORK_DELAYABLE_DEFINE(relay_debounce_work, relay_debounce_work_handler);
-
-static void relay_debounce_work_handler(struct k_work *work) {
-    for (int i = 0; i < RELAY_MAX_SOURCES; i++) {
-        if (battery_dirty[i]) {
-            battery_dirty[i] = false;
-            raise_zmk_battery_relay_state_changed((struct zmk_battery_relay_state_changed){
-                .source          = (uint8_t)i,
-                .state_of_charge = relay_battery_cache[i],
-            });
-        }
-    }
-
-    if (layer_dirty) {
-        layer_dirty = false;
-        raise_zmk_layer_relay_state_changed((struct zmk_layer_relay_state_changed){
-            .layer = relay_layer_cache,
-        });
-    }
-}
-
 uint8_t zmk_battery_relay_get_level(uint8_t source) {
     if (source >= RELAY_MAX_SOURCES) {
         return 0;
@@ -120,29 +63,16 @@ uint8_t zmk_layer_relay_get_index(void) {
 static ssize_t relay_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                const void *buf, uint16_t len, uint16_t offset, uint8_t flags) {
     if (len != sizeof(struct battery_relay_data)) {
-        LOG_WRN("relay write: unexpected length %u", len);
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
     }
 
     const struct battery_relay_data *data = buf;
     relay_diag_write_count++;
 
-    /* Update caches and set dirty flags (safe — just byte writes) */
     if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
         relay_layer_cache = data->level;
-        layer_dirty = true;
-        LOG_DBG("relay: layer %u", data->level);
     } else if (data->source < RELAY_MAX_SOURCES) {
         relay_battery_cache[data->source] = data->level;
-        battery_dirty[data->source] = true;
-        LOG_DBG("relay: source %u battery %u%%", data->source, data->level);
-    }
-
-    /* Schedule debounced event processing on the dedicated relay work queue
-     * (NOT the system work queue — that must stay free for BT TX ops). */
-    if (relay_work_q_started) {
-        k_work_reschedule_for_queue(&relay_work_q, &relay_debounce_work,
-                                    K_MSEC(RELAY_DEBOUNCE_MS));
     }
 
     return len;
@@ -174,7 +104,6 @@ static K_WORK_DELAYABLE_DEFINE(relay_register_work, relay_register_work_handler)
 
 static void relay_register_work_handler(struct k_work *work) {
     if (!bt_is_ready()) {
-        /* BT not ready yet — retry in 200 ms */
         k_work_reschedule(&relay_register_work, K_MSEC(200));
         return;
     }
@@ -184,20 +113,11 @@ static void relay_register_work_handler(struct k_work *work) {
     if (err) {
         LOG_ERR("relay: bt_gatt_service_register failed: %d", err);
     } else {
-        LOG_INF("relay: GATT service registered OK (%u attrs)",
-                (unsigned)relay_svc.attr_count);
+        LOG_INF("relay: GATT service registered OK");
     }
 }
 
 static int relay_peripheral_init(void) {
-    /* Start dedicated work queue for relay event processing */
-    k_work_queue_init(&relay_work_q);
-    k_work_queue_start(&relay_work_q, relay_workq_stack,
-                       K_THREAD_STACK_SIZEOF(relay_workq_stack),
-                       RELAY_WORKQ_PRIORITY, NULL);
-    relay_work_q_started = true;
-
-    /* Defer GATT registration until BT subsystem is ready */
     k_work_schedule(&relay_register_work, K_MSEC(500));
     return 0;
 }

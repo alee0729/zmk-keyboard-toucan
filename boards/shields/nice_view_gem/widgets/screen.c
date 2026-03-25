@@ -14,8 +14,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/battery.h>
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #include <zephyr/bluetooth/conn.h>
-#include "../events/battery_relay_state_changed.h"
-#include "../events/layer_relay_state_changed.h"
+#include "../widgets/battery_relay_peripheral.h"
 #endif
 #include <zmk/display.h>
 #include <zmk/display/widgets/battery_status.h>
@@ -340,29 +339,30 @@ static void battery_peripheral_status_update_cb(struct battery_peripheral_status
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) { set_battery_peripheral_status(widget, state); }
 }
 
-static struct battery_peripheral_status_state battery_peripheral_status_get_state(const zmk_event_t *eh) {
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+
+static struct battery_peripheral_status_state battery_peripheral_status_get_state(const zmk_event_t *eh) {
     const struct zmk_peripheral_battery_state_changed *ev = as_zmk_peripheral_battery_state_changed(eh);
     return (struct battery_peripheral_status_state){
         .source = (ev != NULL) ? ev->source : 0,
         .level = (ev != NULL) ? ev->state_of_charge : 0,
     };
-#else
-    const struct zmk_battery_relay_state_changed *ev = as_zmk_battery_relay_state_changed(eh);
-    return (struct battery_peripheral_status_state){
-        .source = (ev != NULL) ? ev->source : 0,
-        .level = (ev != NULL) ? ev->state_of_charge : 0,
-    };
-#endif
 }
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_peripheral_status, struct battery_peripheral_status_state,
                             battery_peripheral_status_update_cb, battery_peripheral_status_get_state);
-
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_peripheral_battery_state_changed);
-#else
-ZMK_SUBSCRIPTION(widget_battery_peripheral_status, zmk_battery_relay_state_changed);
+
+#else /* Peripheral role: relay data polled via LVGL timer — no event subscription needed */
+
+static struct battery_peripheral_status_state battery_peripheral_status_get_state_poll(const zmk_event_t *eh) {
+    /* Called during widget init only — returns defaults; real data comes from polling */
+    return (struct battery_peripheral_status_state){ .source = 0, .level = 0 };
+}
+
+ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_peripheral_status, struct battery_peripheral_status_state,
+                            battery_peripheral_status_update_cb, battery_peripheral_status_get_state_poll);
+
 #endif
 
 /* Layer status */
@@ -392,20 +392,18 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
 
-#else /* Peripheral role: use layer relay from dongle */
+#else /* Peripheral role: layer relay from dongle — polled via LVGL timer (see below) */
 
 static struct layer_status_state layer_relay_status_get_state(const zmk_event_t *eh) {
-    const struct zmk_layer_relay_state_changed *ev = as_zmk_layer_relay_state_changed(eh);
-
     return (struct layer_status_state){
-        .index = (ev != NULL) ? ev->layer : 0,
+        .index = zmk_layer_relay_get_index(),
     };
 }
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, layer_status_update_cb,
                             layer_relay_status_get_state)
 
-ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_relay_state_changed);
+/* No event subscription — relay data is polled via LVGL timer */
 
 #endif /* !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) */
 
@@ -554,6 +552,60 @@ ZMK_LISTENER(nice_view_gem_display, display_activity_event_handler);
 ZMK_SUBSCRIPTION(nice_view_gem_display, zmk_activity_state_changed);
 
 /**
+ * Relay polling timer (peripheral builds only)
+ *
+ * The relay GATT callback in battery_relay_peripheral.c only updates
+ * simple caches — it raises no events and touches no LVGL state.
+ * This LVGL timer polls those caches and updates the display from the
+ * LVGL thread context, which is the only safe place to call LVGL APIs.
+ *
+ * This completely decouples the BT stack from the display subsystem,
+ * eliminating the deadlocks that occurred with event-driven approaches.
+ **/
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+
+#define RELAY_POLL_INTERVAL_MS 1000
+#define RELAY_POLL_MAX_SOURCES 2
+
+static uint8_t relay_poll_last_battery[RELAY_POLL_MAX_SOURCES];
+static uint8_t relay_poll_last_layer = 0xFF; /* invalid initial value to force first update */
+
+static void relay_poll_timer_cb(lv_timer_t *timer) {
+    bool changed = false;
+
+    /* Check battery sources */
+    for (int i = 0; i < RELAY_POLL_MAX_SOURCES; i++) {
+        uint8_t level = zmk_battery_relay_get_level(i);
+        if (level != relay_poll_last_battery[i]) {
+            relay_poll_last_battery[i] = level;
+            /* Update display via existing widget callback */
+            battery_peripheral_status_update_cb((struct battery_peripheral_status_state){
+                .source = (uint8_t)i,
+                .level = level,
+            });
+            changed = true;
+        }
+    }
+
+    /* Check layer */
+    uint8_t layer = zmk_layer_relay_get_index();
+    if (layer != relay_poll_last_layer) {
+        relay_poll_last_layer = layer;
+        layer_status_update_cb((struct layer_status_state){
+            .index = layer,
+        });
+        changed = true;
+    }
+
+    /* Also trigger periodic redraw for diagnostic line updates (write count etc.)
+     * even if battery/layer haven't changed */
+    (void)changed;
+}
+
+#endif /* peripheral role */
+
+/**
  * Initialization
  **/
 
@@ -574,6 +626,8 @@ int zmk_widget_screen_init(struct zmk_widget_screen *widget, lv_obj_t *parent) {
     widget_output_status_init();
 #else
     widget_connection_status_init();
+    /* Start polling relay caches for display updates */
+    lv_timer_create(relay_poll_timer_cb, RELAY_POLL_INTERVAL_MS, NULL);
 #endif
 
     return 0;

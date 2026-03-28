@@ -18,6 +18,9 @@
  * This is a patched copy of zmk-dongle-screen's battery_relay_peripheral.c
  * updated to use the ZMK v0.3 raise_zmk_*() event API instead of the
  * removed ZMK_EVENT_RAISE(new_zmk_*()) pattern.
+ *
+ * Layer relay is temporarily DISABLED — code is left in place (commented out)
+ * while battery relay timing is being stabilised.
  */
 
 #include <zephyr/kernel.h>
@@ -83,18 +86,23 @@ static ssize_t battery_relay_write_cb(struct bt_conn *conn,
         return len;
     }
 
-    /* Layer data is multiplexed through this characteristic.
-     * source=0xFE means level contains the active layer index.
-     * Store it and raise zmk_layer_state_changed so the layer_status
-     * widget redraws with the relayed value. */
+    /*
+     * Layer relay DISABLED — temporarily commented out while battery relay
+     * timing is being stabilised.
+     *
+     * if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
+     *     relayed_layer = data->level;
+     *     LOG_DBG("relay: layer=%u", relayed_layer);
+     *     raise_zmk_layer_state_changed((struct zmk_layer_state_changed){
+     *         .layer = relayed_layer,
+     *         .state = true,
+     *         .timestamp = k_uptime_get(),
+     *     });
+     *     return len;
+     * }
+     */
     if (data->source == BATTERY_RELAY_SOURCE_LAYER) {
-        relayed_layer = data->level;
-        LOG_DBG("relay: layer=%u", relayed_layer);
-        raise_zmk_layer_state_changed((struct zmk_layer_state_changed){
-            .layer = relayed_layer,
-            .state = true,
-            .timestamp = k_uptime_get(),
-        });
+        /* Layer relay disabled: silently ignore layer writes */
         return len;
     }
 

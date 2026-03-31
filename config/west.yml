@@ -22,7 +22,7 @@ manifest:
       revision: v0.3
     - name: zmk-dongle-screen
       remote: albertclee
-      revision: claude/fix-battery-relay-timing-UVT7H
+      revision: codex/revise-dongle-code-for-better-timing
       
   self:
     path: config

@@ -64,11 +64,9 @@
         dr-gpios = <&gpio0 2 (GPIO_ACTIVE_HIGH)>;
         sensitivity = "2x";
         x-invert;
-
-        // Optional: turning this on enables very aggressive power saving, after 5 seconds with no touches
-        // the trackpad will go to sleep.  It wakes up on touch, but there is a ~300ms delay.  Most users will find
-        // the standard behavior of 'put to sleep when zmk enters idle state (30 seconds without a keypress) feels better.
-	    //sleep;
+        sleep;              // hardware sleep register; idle sleeper (see toucan_right.conf) manages when it activates
+        no-glide-extend;    // suppress post-lift GlideExtend packets — reduces unnecessary IRQs/CPU wakeups
+        adaptive-sample-rate; // 100 samples/s during movement, 25 samples/s when still
     };
 };
 

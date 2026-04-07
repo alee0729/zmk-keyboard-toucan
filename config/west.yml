@@ -18,7 +18,7 @@ manifest:
       import: app/west.yml
     - name: cirque-input-module
       remote: albertclee
-      revision: claude/fix-glidepoint-responsiveness-OYc4Z
+      revision: main
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3

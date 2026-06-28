@@ -4,10 +4,6 @@ manifest:
   remotes:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
-    - name: petejohanson
-      url-base: https://github.com/petejohanson
-    - name: albertclee
-      url-base: https://github.com/alee0729
     - name: caksoylar
       url-base: https://github.com/caksoylar
     - name: geeksville
@@ -16,9 +12,10 @@ manifest:
     - name: zmk
       remote: zmkfirmware
       import: app/west.yml
-    - name: cirque-input-module
-      remote: albertclee
-      revision: main
+      revision: v0.3
+    - name: zmk_driver_azoteq
+      remote: geeksville
+      revision: master
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3

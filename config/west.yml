@@ -8,14 +8,16 @@ manifest:
       url-base: https://github.com/caksoylar
     - name: geeksville
       url-base: https://github.com/geeksville
+    - name: albertclee
+      url-base: https://github.com/alee0729
   projects:
     - name: zmk
       remote: zmkfirmware
       import: app/west.yml
       revision: v0.3
     - name: zmk_driver_azoteq
-      remote: geeksville
-      revision: toucan2
+      remote: albertclee
+      revision: claude/trackpad-sensitivity-gestures-mgtvam 
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3

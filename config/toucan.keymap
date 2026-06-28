@@ -22,7 +22,7 @@
 &zip_button_behaviors {
     codes = <INPUT_BTN_4 INPUT_BTN_5 INPUT_BTN_6 INPUT_BTN_7 INPUT_BTN_8 INPUT_BTN_9>;
     bindings =
-        <&kp LG(EQUAL)>,   /* BTN_4  pinch-out / zoom in    -> Cmd +            */
+        <&kp LG(PLUS)>,    /* BTN_4  pinch-out / zoom in    -> Cmd + (Cmd-Shift-=, works in native apps) */
         <&kp LG(MINUS)>,   /* BTN_5  pinch-in  / zoom out   -> Cmd -            */
         <&kp LC(UP)>,      /* BTN_6  3-finger swipe up      -> Mission Control  */
         <&kp LC(DOWN)>,    /* BTN_7  3-finger swipe down    -> App Expose       */

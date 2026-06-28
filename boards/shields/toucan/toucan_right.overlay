@@ -58,25 +58,49 @@
 
         enable-power-management;
 
-        /* Cursor feel: the driver default dropped 100 -> 50. The driver carries
-           the sub-unit rounding remainder between reports, so slow/fine moves
-           still register at the lower sensitivity. */
-        sensitivity = <50>;
-        /* Lowered from 60: the driver emits wheel = rel * scroll-sensitivity/100
-           with no fractional carry, so a high value makes 2-finger scroll jump.
-           The listener's zip_scroll_scaler (toucan.dtsi) smooths it further. */
-        scroll-sensitivity = <40>;
-        zoom-sensitivity = <50>;
+        /* Cursor feel: base sensitivity (the driver carries the sub-unit rounding
+           remainder so slow/fine moves still register). On top of this, macOS-like
+           pointer acceleration scales the gain by finger speed: slow strokes get
+           finer control, fast flicks reach across the screen.
+           Lowered 50 -> 25 to slow the cursor by 50% (it felt too darty/fast).
+           Since gain = sensitivity * accel/100, this scales the whole accel curve
+           down uniformly. */
+        sensitivity = <25>;
+        pointer-acceleration;
+        accel-min-gain = <60>;       /* fine control at very low speed */
+        accel-max-gain = <240>;      /* fast flick-to-edge */
+        accel-slow-threshold = <3>;
+        accel-fast-threshold = <20>;
+
+        /* 2-finger scroll. The driver now carries a per-axis sub-detent remainder
+           and emits BOTH axes (fluid/diagonal), so a higher sensitivity no longer
+           jumps. The listener's zip_scroll_scaler (toucan.dtsi) smooths further. */
+        scroll-sensitivity = <55>;
+        /* Raised 50 -> 100: at 50 a normal pinch rarely accumulated enough to
+           emit even one zoom step, so pinch-to-zoom appeared dead. */
+        zoom-sensitivity = <100>;
+
+        /* Fast active report rate (ms) is the biggest single smoothness lever:
+           100 Hz while tracking, with a quick idle-touch rate so a resting finger
+           stays responsive. Back off (e.g. 13) if logs show TPS43_RR_MISSED. */
+        report-rate-active = <10>;
+        report-rate-idle-touch = <16>;
 
         filter-settings=<0x0B>;
 
-        /* Pinch-to-zoom: emits one momentary press+release per zoom step
-           (default codes shown). zoom-step is the accumulated magnitude needed
-           to fire one step - larger = coarser. Map these on the host as you
-           like (e.g. Ctrl+= / Ctrl+-). Requires the `zoom` gesture below. */
+        /* Tap / hold timing for a snappier, more macOS-like click and drag. */
+        tap-time = <180>;
+        hold-time = <300>;
+
+        /* Pinch-to-zoom: emits one momentary press+release per zoom step.
+           zoom-step is the accumulated pinch magnitude needed to fire one step -
+           larger = coarser/fewer. Lowered 30 -> 20 (with zoom-sensitivity raised
+           to 100) so a normal pinch reliably produces visible zoom steps. The
+           driver caps the steps emitted per report, so this can't flood.
+           Mapped on the host in config/toucan.keymap (Cmd +/- on macOS). */
         zoom-in-code = <INPUT_BTN_4>;
         zoom-out-code = <INPUT_BTN_5>;
-        zoom-step = <30>;
+        zoom-step = <20>;
 
         /* 3-finger swipes: latched + threshold-based, so each swipe fires
            exactly once and uses codes distinct from the 1-finger swipe codes
@@ -86,7 +110,10 @@
         three-finger-swipe-down-code = <INPUT_BTN_7>;
         three-finger-swipe-left-code = <INPUT_BTN_8>;
         three-finger-swipe-right-code = <INPUT_BTN_9>;
-        three-finger-swipe-threshold = <150>;
+        /* Lowered so a normal-length 3-finger swipe fires reliably once. The
+           driver now keeps accumulating across a transient 4th-finger brush
+           (counts >= 3) instead of resetting, so the latch is more dependable. */
+        three-finger-swipe-threshold = <120>;
 
         scroll;
         two-finger-tap;

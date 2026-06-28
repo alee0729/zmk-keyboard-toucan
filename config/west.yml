@@ -15,7 +15,7 @@ manifest:
       revision: v0.3
     - name: zmk_driver_azoteq
       remote: geeksville
-      revision: master
+      revision: toucan2
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3

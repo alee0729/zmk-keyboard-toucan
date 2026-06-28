@@ -75,20 +75,4 @@
 
 &glidepoint_split {
     device = <&tps43_trackpad>;
-};        spi-max-frequency = <1000000>;
-        status = "okay";
-        dr-gpios = <&gpio0 2 (GPIO_ACTIVE_HIGH)>;
-        sensitivity = "2x";
-        x-invert;
-        sleep;              // hardware sleep register; idle sleeper (see toucan_right.conf) manages when it activates
-        no-glide-extend;    // suppress post-lift GlideExtend packets — reduces unnecessary IRQs/CPU wakeups
-        adaptive-sample-rate; // 100 samples/s during movement, 25 samples/s when still
-    };
-};
-
-&glidepoint_split {
-    device = <&glidepoint>;
-
-    // Optional
-    // input-processors = <&zip_xy_transform (INPUT_TRANSFORM_XY_SWAP | INPUT_TRANSFORM_X_INVERT | INPUT_TRANSFORM_Y_INVERT)>;
 };

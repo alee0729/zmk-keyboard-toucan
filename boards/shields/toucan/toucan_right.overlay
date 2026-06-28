@@ -58,12 +58,14 @@
 
         enable-power-management;
 
-        /* Cursor feel: base sensitivity stays at 50 (the driver carries the
-           sub-unit rounding remainder so slow/fine moves still register). On top
-           of this, macOS-like pointer acceleration scales the gain by finger
-           speed: slow strokes get finer control, fast flicks reach across the
-           screen. The curve is centered so mid-speed feel is ~unchanged. */
-        sensitivity = <50>;
+        /* Cursor feel: base sensitivity (the driver carries the sub-unit rounding
+           remainder so slow/fine moves still register). On top of this, macOS-like
+           pointer acceleration scales the gain by finger speed: slow strokes get
+           finer control, fast flicks reach across the screen.
+           Lowered 50 -> 25 to slow the cursor by 50% (it felt too darty/fast).
+           Since gain = sensitivity * accel/100, this scales the whole accel curve
+           down uniformly. */
+        sensitivity = <25>;
         pointer-acceleration;
         accel-min-gain = <60>;       /* fine control at very low speed */
         accel-max-gain = <240>;      /* fast flick-to-edge */

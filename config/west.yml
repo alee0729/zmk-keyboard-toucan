@@ -17,7 +17,7 @@ manifest:
       revision: v0.3
     - name: zmk_driver_azoteq
       remote: albertclee
-      revision: claude/trackpad-sensitivity-gestures-mgtvam 
+      revision: claude/keymapping-macos-trackpad-nt7rjt
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3

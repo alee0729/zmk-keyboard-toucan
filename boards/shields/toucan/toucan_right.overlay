@@ -76,7 +76,9 @@
            and emits BOTH axes (fluid/diagonal), so a higher sensitivity no longer
            jumps. The listener's zip_scroll_scaler (toucan.dtsi) smooths further. */
         scroll-sensitivity = <55>;
-        zoom-sensitivity = <50>;
+        /* Raised 50 -> 100: at 50 a normal pinch rarely accumulated enough to
+           emit even one zoom step, so pinch-to-zoom appeared dead. */
+        zoom-sensitivity = <100>;
 
         /* Fast active report rate (ms) is the biggest single smoothness lever:
            100 Hz while tracking, with a quick idle-touch rate so a resting finger
@@ -90,13 +92,15 @@
         tap-time = <180>;
         hold-time = <300>;
 
-        /* Pinch-to-zoom: emits one momentary press+release per zoom step
-           (default codes shown). zoom-step is the accumulated magnitude needed
-           to fire one step - larger = coarser. Map these on the host as you
-           like (e.g. Ctrl+= / Ctrl+-). Requires the `zoom` gesture below. */
+        /* Pinch-to-zoom: emits one momentary press+release per zoom step.
+           zoom-step is the accumulated pinch magnitude needed to fire one step -
+           larger = coarser/fewer. Lowered 30 -> 20 (with zoom-sensitivity raised
+           to 100) so a normal pinch reliably produces visible zoom steps. The
+           driver caps the steps emitted per report, so this can't flood.
+           Mapped on the host in config/toucan.keymap (Cmd +/- on macOS). */
         zoom-in-code = <INPUT_BTN_4>;
         zoom-out-code = <INPUT_BTN_5>;
-        zoom-step = <30>;
+        zoom-step = <20>;
 
         /* 3-finger swipes: latched + threshold-based, so each swipe fires
            exactly once and uses codes distinct from the 1-finger swipe codes

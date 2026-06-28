@@ -2,6 +2,7 @@
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/keys.h>
 #include <dt-bindings/zmk/pointing.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 
 #define BASE 0
 #define NAV  1
@@ -11,6 +12,22 @@
 &mt {
     tapping-term-ms = <800>;
     flavor = "tap-preferred";
+};
+
+/* Trackpad gesture -> key mappings (macOS).
+   The Azoteq driver emits these button codes; the zip_button_behaviors input
+   processor (attached to the trackpad listener in toucan.dtsi) turns each into
+   the behavior below. Retarget a gesture by changing its binding here; the
+   codes must stay in sync with the *-code values in toucan_right.overlay. */
+&zip_button_behaviors {
+    codes = <INPUT_BTN_4 INPUT_BTN_5 INPUT_BTN_6 INPUT_BTN_7 INPUT_BTN_8 INPUT_BTN_9>;
+    bindings =
+        <&kp LG(EQUAL)>,   /* BTN_4  pinch-out / zoom in    -> Cmd +            */
+        <&kp LG(MINUS)>,   /* BTN_5  pinch-in  / zoom out   -> Cmd -            */
+        <&kp LC(UP)>,      /* BTN_6  3-finger swipe up      -> Mission Control  */
+        <&kp LC(DOWN)>,    /* BTN_7  3-finger swipe down    -> App Expose       */
+        <&kp LC(LEFT)>,    /* BTN_8  3-finger swipe left    -> previous Space   */
+        <&kp LC(RIGHT)>;   /* BTN_9  3-finger swipe right   -> next Space       */
 };
 
 / {

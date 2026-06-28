@@ -62,7 +62,10 @@
            the sub-unit rounding remainder between reports, so slow/fine moves
            still register at the lower sensitivity. */
         sensitivity = <50>;
-        scroll-sensitivity = <60>;
+        /* Lowered from 60: the driver emits wheel = rel * scroll-sensitivity/100
+           with no fractional carry, so a high value makes 2-finger scroll jump.
+           The listener's zip_scroll_scaler (toucan.dtsi) smooths it further. */
+        scroll-sensitivity = <40>;
         zoom-sensitivity = <50>;
 
         filter-settings=<0x0B>;

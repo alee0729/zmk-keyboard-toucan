@@ -117,7 +117,7 @@
             compatible = "zmk,input-processor-behaviors";
             #input-processor-cells = <0>;
             codes = <INPUT_BTN_NORTH INPUT_BTN_EAST INPUT_BTN_SOUTH INPUT_BTN_WEST>;
-            bindings = <&kp A>, <&kp B>, <&kp C>, <&kp D>;
+            bindings = <&kp LC(LG(UP))>, <&kp LC(LG(RIGHT))>, <&kp LC(LG(DOWN))>, <&kp LC(LG(LEFT))>;
         };
     };
 

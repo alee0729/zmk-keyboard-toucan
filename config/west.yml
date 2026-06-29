@@ -6,6 +6,8 @@ manifest:
       url-base: https://github.com/caksoylar
     - name: geeksville
       url-base: https://github.com/geeksville
+    - name: beekeeb
+      url-base: https://github.com/beekeeb
   projects:
     - name: zmk
       remote: zmkfirmware
@@ -17,5 +19,8 @@ manifest:
     - name: zmk_driver_azoteq
       remote: geeksville
       revision: master
+    - name: zmk-input-zoom
+      remote: beekeeb
+      revision: main
   self:
     path: config

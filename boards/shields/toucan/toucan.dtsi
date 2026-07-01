@@ -135,7 +135,7 @@
     trackpad_listener: trackpad_listener {
         compatible = "zmk,input-listener";
         status = "disabled";
-        device = <&glidepoint_split>;
+        device = <&trackpad_split>;
         /* Base processors run on every layer:
            - zip_xy_scaler: cursor speed.
            - zip_scroll_scaler: tame the driver's coarse 2-finger wheel deltas.

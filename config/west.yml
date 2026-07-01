@@ -6,6 +6,8 @@ manifest:
       url-base: https://github.com/caksoylar
     - name: geeksville
       url-base: https://github.com/geeksville
+    - name: beekeeb
+      url-base: https://github.com/beekeeb
     - name: albertclee
       url-base: https://github.com/alee0729
   projects:

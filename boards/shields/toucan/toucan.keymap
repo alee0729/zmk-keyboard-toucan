@@ -2,7 +2,6 @@
 #include <dt-bindings/zmk/keys.h>
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/outputs.h>
-#include <dt-bindings/zmk/pointing.h>
 
 #define BASE 0
 #define NAV  1
@@ -60,15 +59,8 @@
                                    &kp LGUI &mo NAV &kp SPACE   &kp RET &mo 2 &kp RALT
             >;
         };
-
-        mouse {
-            display-name = "MOU";
-            bindings = <
-                &trans &trans &trans &trans &trans &trans           &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans           &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans           &trans &trans &trans &trans &trans &trans
-                            &mkp MCLK &mkp LCLK &mkp RCLK           &mkp LCLK &mkp RCLK &mkp MCLK
-            >;
+        extra_1 {
+                status = "reserved";
         };
 
         extra_2 {

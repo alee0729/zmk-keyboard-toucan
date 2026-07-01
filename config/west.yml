@@ -6,19 +6,19 @@ manifest:
       url-base: https://github.com/caksoylar
     - name: geeksville
       url-base: https://github.com/geeksville
-    - name: beekeeb
-      url-base: https://github.com/beekeeb
+    - name: albertclee
+      url-base: https://github.com/alee0729
   projects:
     - name: zmk
       remote: zmkfirmware
       import: app/west.yml
       revision: v0.3
+    - name: zmk_driver_azoteq
+      remote: albertclee
+      revision: toucan2
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3
-    - name: zmk_driver_azoteq
-      remote: geeksville
-      revision: master
     - name: zmk-input-zoom
       remote: beekeeb
       revision: main

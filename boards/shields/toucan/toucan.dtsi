@@ -135,8 +135,16 @@
     trackpad_listener: trackpad_listener {
         compatible = "zmk,input-listener";
         status = "disabled";
-        device = <&trackpad_split>;
-        input-processors = <&zip_xy_scaler 100 100>, <&zip_scroll_scaler 1 20>, <&zip_zoom_mapper>, <&is_touching_processor>, <&swipe_button_mapper>;
+        device = <&glidepoint_split>;
+        /* Base processors run on every layer:
+           - zip_xy_scaler: cursor speed.
+           - zip_scroll_scaler: tame the driver's coarse 2-finger wheel deltas.
+             It tracks remainders, so it smooths the scroll instead of just
+             truncating it. (The layer 1/2 scroller below scales further.)
+           - zip_button_behaviors: turn the gesture button codes (zoom /
+             3-finger swipe) into key behaviors. The code->behavior map lives
+             in &zip_button_behaviors in config/toucan.keymap. */
+        input-processors = <&zip_xy_scaler 250 100>, <&zip_scroll_scaler 1 3>, <&zip_button_behaviors>;
         scroller {
             layers = <1 2>;
             input-processors = <

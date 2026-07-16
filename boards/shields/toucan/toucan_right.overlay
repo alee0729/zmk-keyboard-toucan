@@ -57,16 +57,16 @@
         rdy-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
 
         enable-power-management;
-        /* Fully suspend the trackpad (SUSPEND bit: charge transfer halted, ~uA)
-           whenever THIS half goes ZMK-idle - 30 s with no right-half key press
-           and no trackpad touch (CONFIG_ZMK_IDLE_TIMEOUT). Touching the pad
-           counts as activity, so it can never suspend mid-use. A suspended pad
-           cannot wake itself (RDY is disabled in suspend): press any right-half
-           key and the first touch registers ~300 ms later. Without this
-           property the driver only suspends at deep sleep (1 h), leaving the
-           pad scanning at ~1.7 mA the whole time. If the wake-up tradeoff ever
-           annoys, raise CONFIG_ZMK_IDLE_TIMEOUT rather than removing this. */
-        idle-sleep;
+        /* Slow-scan idle: when THIS half goes ZMK-idle (30 s with no right-half
+           key press and no touch - CONFIG_ZMK_IDLE_TIMEOUT), slow the chip's
+           LP2 ALP scan floor from 160 ms to 500 ms instead of suspending. The
+           pad keeps sensing and WAKES ITSELF on touch: the first touch
+           registers within ~0.5 s, no key press needed. (The previous
+           `idle-sleep;` full suspend halted sensing entirely, leaving the pad
+           dead until a right-half key press - rejected as UX.) Full suspend
+           (~uA) still happens at deep sleep (CONFIG_ZMK_IDLE_SLEEP_TIMEOUT,
+           1 h). Mutually exclusive with `idle-sleep` (build error if both). */
+        idle-scan-rate-ms = <500>;
 
         /* Cursor feel: base sensitivity (the driver carries the sub-unit rounding
            remainder so slow/fine moves still register). On top of this, macOS-like

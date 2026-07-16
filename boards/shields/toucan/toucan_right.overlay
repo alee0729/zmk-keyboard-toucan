@@ -92,9 +92,37 @@
 
         /* Fast active report rate (ms) is the biggest single smoothness lever:
            100 Hz while tracking, with a quick idle-touch rate so a resting finger
-           stays responsive. Back off (e.g. 13) if logs show TPS43_RR_MISSED. */
+           stays responsive. Back off (e.g. 13, the firmware default) if logs show
+           TPS43_RR_MISSED - or to save power while tracking. */
         report-rate-active = <10>;
         report-rate-idle-touch = <16>;
+
+        /* --- Internal auto power ladder (Active -> Idle-Touch -> Idle -> LP1 ->
+           LP2). idle-sleep above covers the "whole half is idle" case; this
+           ladder governs trackpad power while the half stays ZMK-ACTIVE (e.g.
+           long typing sessions that never touch the pad) and the first 30 s
+           after the last touch. Registers are only written when set here;
+           unset ones keep firmware defaults (register dump in the driver repo,
+           doc/develop.md). NOTE: timeout-lp1 is in 20-SECOND units. */
+        report-rate-idle = <50>;   /* full-panel scan 20 Hz (fw default, pinned) */
+        report-rate-lp1 = <80>;    /* ALP scan 12.5 Hz (fw default, pinned) */
+        report-rate-lp2 = <160>;   /* ALP scan 6.25 Hz floor (fw default, pinned) */
+        timeout-active = <5>;      /* fw default, pinned */
+        timeout-idle-touch = <20>; /* was 60: a resting finger drops to Idle sooner */
+        timeout-idle = <4>;        /* was 10: reach LP1 4 s after finger lift */
+        timeout-lp1 = <1>;         /* 1 x 20 s: LP2 floor ~24 s after finger lift */
+
+        /* Optional aggressive tier - trades first-touch latency (up to ~250 ms
+           from LP2, comparable to the accepted ~300 ms suspend wake) for a
+           lower scanning floor and faster descent:
+        report-rate-idle-touch = <32>;
+        report-rate-idle = <80>;
+        report-rate-lp1 = <120>;
+        report-rate-lp2 = <250>;
+        timeout-active = <3>;
+        timeout-idle-touch = <10>;
+        timeout-idle = <2>;
+        */
 
         filter-settings=<0x0B>;
 

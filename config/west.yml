@@ -17,10 +17,7 @@ manifest:
       revision: v0.3
     - name: zmk_driver_azoteq
       remote: albertclee
-      # TEMP: pinned to the feature branch so this PR's CI compiles the new
-      # idle-scan-rate-ms driver code (the driver repo has no CI of its own).
-      # Revert to `toucan2` once the driver PR merges there.
-      revision: slow-scan-idle
+      revision: toucan2
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: v0.3

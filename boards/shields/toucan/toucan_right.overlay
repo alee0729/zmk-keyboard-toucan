@@ -57,16 +57,28 @@
         rdy-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
 
         enable-power-management;
-        /* Slow-scan idle: when THIS half goes ZMK-idle (30 s with no right-half
-           key press and no touch - CONFIG_ZMK_IDLE_TIMEOUT), slow the chip's
-           LP2 ALP scan floor from 160 ms to 500 ms instead of suspending. The
-           pad keeps sensing and WAKES ITSELF on touch: the first touch
-           registers within ~0.5 s, no key press needed. (The previous
-           `idle-sleep;` full suspend halted sensing entirely, leaving the pad
-           dead until a right-half key press - rejected as UX.) Full suspend
-           (~uA) still happens at deep sleep (CONFIG_ZMK_IDLE_SLEEP_TIMEOUT,
-           1 h). Mutually exclusive with `idle-sleep` (build error if both). */
-        idle-scan-rate-ms = <500>;
+        /* Fully suspend the trackpad (SUSPEND bit set, RDY interrupt disabled,
+           ~uA, charge transfer halted) when THIS half goes ZMK-idle - 10 min
+           with no right-half key press and no touch (CONFIG_ZMK_IDLE_TIMEOUT in
+           toucan_right.conf).
+
+           This is a correctness requirement, not a power tweak: it is the only
+           thing that lets this half reach deep sleep. ZMK's activity.c registers
+           a wildcard input callback (INPUT_CALLBACK_DEFINE(NULL, ...) under
+           CONFIG_ZMK_POINTING, with no split-role guard), so ANY report this pad
+           emits resets the single timestamp behind both the idle and the
+           deep-sleep timeout. A pad left sensing for the whole hour only has to
+           glitch once - a sub-threshold contact, a drifting ALP baseline - and
+           the half stays awake all night. Once suspended it physically cannot
+           report, so the remaining ~50 min run undisturbed to deep sleep.
+
+           Cost: a suspended pad cannot wake itself. Press any right-half key and
+           the first touch registers ~300 ms later. `idle-scan-rate-ms = <500>`
+           was tried here instead (keeps sensing, wakes on touch) and is what
+           broke overnight deep sleep - hence the 30 s -> 10 min idle timeout to
+           make this trade-off livable rather than removing the suspend. Mutually
+           exclusive with `idle-scan-rate-ms` (build error if both). */
+        idle-sleep;
 
         /* Cursor feel: base sensitivity (the driver carries the sub-unit rounding
            remainder so slow/fine moves still register). On top of this, macOS-like
@@ -100,8 +112,10 @@
         /* --- Internal auto power ladder (Active -> Idle-Touch -> Idle -> LP1 ->
            LP2). idle-sleep above covers the "whole half is idle" case; this
            ladder governs trackpad power while the half stays ZMK-ACTIVE (e.g.
-           long typing sessions that never touch the pad) and the first 30 s
-           after the last touch. Registers are only written when set here;
+           long typing sessions that never touch the pad) and the 10 min between
+           the last touch and the idle suspend - so it now carries most of the
+           in-use power story, and its LP2 floor is what the pad sits at during
+           that whole window. Registers are only written when set here;
            unset ones keep firmware defaults (register dump in the driver repo,
            doc/develop.md). NOTE: timeout-lp1 is in 20-SECOND units. */
         report-rate-idle = <50>;   /* full-panel scan 20 Hz (fw default, pinned) */
